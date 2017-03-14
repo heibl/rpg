@@ -9,7 +9,7 @@ Description: PASTA (Mirarab, Nguyen, and Warnow 2014) is a highly accurate and s
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
-Imports: 
+Imports:
  ape,
  Rcpp (>= 0.12.9)
 LinkingTo: Rcpp
