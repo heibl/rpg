@@ -6,17 +6,17 @@
 #' @return list containing GUIDANCE column score, the residue score and sequence score
 #'
 #' @author Franz-Sebastian Krah
+#' @export
 
 calc_scores <- function(ref, com, n_id = 1){
 
   locdir <- getwd()
-  locdir_runs <- paste(paste(locdir, "score_run", sep ="/"), n_id, sep ="")
+  locdir_runs <- paste0(paste(locdir, "score_run", sep ="/"), n_id)
   dir.create(locdir_runs)
   seqinr::write.fasta(as.list(ref), names = paste0("S", 1:dim(ref)[1]),
     file =paste(locdir_runs, "ref.fasta", sep = "/"))
   seqinr::write.fasta(as.list(com), names = paste0("S", 1:dim(com)[1]),
     file = paste(locdir_runs, "com.fasta", sep = "/"))
-
 
   system(paste(paste(locdir, "src/msa_set_score", sep ="/"),
     paste(locdir_runs, "ref.fasta", sep="/"),
