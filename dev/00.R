@@ -2,27 +2,40 @@ library("ips")
 library("foreach")
 library("parallel")
 library("doSNOW")
-library(pbmcapply)
-# 1.	Read sequences
+library("pbmcapply")
+library("phangorn")
+library("plyr")
+library("ggplot2")
+
+# 1.	Read example sequences
+## DNA
 ms <- read.fas("dev/data/cortinarius_28s_ms.fas")
-# ms <- read.FASTA("data/_28s.fas")
 set.seed(100)
-ms_test <- sample(ms, 10)
+seq <- sample(ms, 200)
+
+## Amino Acids
+suppressWarnings(
+  seq <- seqinr::read.fasta("dev/data/AATF.fas", seqtype = "AA")
+)
 
 
-dna = ms_test
+seq = seq
 ncore = 2
 bootstrap = 100
 msa.program = "mafft"
 method = "auto"
 parallel  = TRUE
 cutoff = 0.93
+mask = FALSE
 
-system.time(test <- guidance(dna = ms_test,
-                                ncore = 2,
-                                bootstrap = 100,
-                                msa.program = "mafft",
-                                method = "auto",
-                                parallel  = TRUE,
-                                cutoff = 0.93))
-# 15 min with 2 cores
+# system.time(test <- guidance(seq = seq,
+#                                 ncore = 2,
+#                                 bootstrap = 100,
+#                                 msa.program = "mafft",
+#                                 method = "auto",
+#                                 parallel  = TRUE,
+#                                 cutoff = 0.93,
+#                                 mask = FALSE))
+
+# guidance_heatmap(test, file ="dev/data/test_msa_plot.pdf")
+# guidance_heatmap(test)

@@ -1,13 +1,14 @@
-#' \code{guidance} GUIDetree-based AligNment ConficencE
+#' GUIDetree-based AligNment ConficencE
 #'
 #'
-#' @param seq is the raw input sequences of class seqbin.
+#' @param seq is the raw input sequences of class DNAbin (DNA) or SeqFastaAA (AA)
 #' @param cutoff specifies a cutoff to remove unreliable columns below the cutoff
 #' @param parallel logical, if TRUE, specify the number of cores
 #' @param ncore number of cores
 #' @param bootstrap number of perturbated MSAs (default = 100)
 #' @param msa.program one of c("mafft", "prank"), default is MAFFT
 #' @param method further arguments passed to mafft, default is "auto"
+#' @mask specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA)
 #'
 #' @return alignment_score: is the GUIDANCE alignment score
 #' @return GUIDANCE_residue_score
@@ -26,51 +27,77 @@
 #' @import foreach
 #' @import parallel
 #' @import pbmcapply
+#' @import plyr
+#' @import phangorn
 #'
 #' @author Franz-Sebastian Krah
 
 guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
-  bootstrap = 100, msa.program = "mafft", method = "auto"){
+  bootstrap = 100, msa.program = "mafft", method = "auto", mask = FALSE){
 
-  if (!is.object(seq)){
+  if (length(grep("\\.fas", seq))> 0){
     seq <- read.FASTA(seq)
   }
 
   ##############################################
   ## SOME CHECKS
   ##############################################
-  if (!inherits(seq, "seqbin"))
-    stop("sequences not of class seqbin (ape)")
+  if (!inherits(seq, "DNAbin") & !inherits(seq[[1]], "SeqFastaAA"))
+    stop("sequences not of class DNAbin (ape) or SeqFastaAA (seqinr)")
+
 
   ##############################################
   ## PART I
   ##############################################
   ## BASE and PERTUBATED MSAs
   ##############################################
+  seq_nam <- names(seq)
 
+
+  ## if AA Sequences perform data prep first
+  if(inherits(seq[[1]], "SeqFastaAA")){
+    seq <- lapply(seq, as.character)
+    seq <- rbind.fill(lapply(seq,
+      function(y) { as.data.frame(t(y), stringsAsFactors=FALSE) }))
+    seq <- as.AAbin(as.matrix(seq))
+  }
 
   ## Generate BASE alignment
   ###########################
   cat("Generating the base alignment \n")
   if (msa.program == "mafft"){
-    base.msa <- ips::mafft(seq, method = method)
+    base.msa <- mafft_AA(seq, method = method)
   }
   if (msa.program == "prank"){
     base.msa <- ips::prank(seq)
   }
-  base.msa <- as.character(base.msa)
+  if(inherits(seq, "DNAbin")){   base.msa <- as.character(base.msa) }
+  if(inherits(seq, "AAbin")){    base.msa <- do.call(rbind, base.msa) }
+
+  rownames(base.msa) <- seq_nam
+
 
   ## Constructing BP guide-trees for the pertubated MSAs
   #######################################################
   cat("Pertubating base alignment \n")
   pb <- txtProgressBar(min = 0, max = bootstrap, style = 3)
 
-  base.msa.bp <- foreach(i = 1:bootstrap) %do% {
-    setTxtProgressBar(pb, i)
-    pertubatedMSA <- as.DNAbin(base.msa[,sample(ncol(base.msa), replace = TRUE)])
-    return(pertubatedMSA)
+  if(inherits(seq, "DNAbin")){
+    base.msa.bp <- foreach(i = 1:bootstrap) %do% {
+      setTxtProgressBar(pb, i)
+      pertubatedMSA <- as.DNAbin(base.msa[,sample(ncol(base.msa), replace = TRUE)])
+      return(pertubatedMSA)
+    }
+  }
+  if(inherits(seq, "AAbin")){
+    base.msa.bp <- foreach(i = 1:bootstrap) %do% {
+      setTxtProgressBar(pb, i)
+      pertubatedMSA <- as.AAbin(base.msa[,sample(ncol(base.msa), replace = TRUE)])
+      return(pertubatedMSA)
+    }
   }
   close(pb)
+
 
   ## Generating alternative (pertubated) MSAs
   ###########################################
@@ -87,7 +114,8 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
     registerDoSNOW(cl)
     nj.guide.trees <- foreach(i = 1:bootstrap, .options.snow = opts) %dopar% {
       # convert to class phyDAT
-      base.msa.ml <- phangorn::as.phyDat(base.msa.bp[[i]])
+      # base.msa.ml <- phangorn::as.phyDat(base.msa.bp[[i]])
+      base.msa.ml <- phangorn::as.phyDat(as.character(base.msa.bp[[i]]))
       # find ML distance as input to nj tree search
       ml.dist.msa <- phangorn::dist.ml(base.msa.ml)
       # NJ
@@ -123,6 +151,7 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
 
   ## Alignment of MSA BP times with new NJ guide trees
   cat("  Alignment of pertubated MSAs using NJ guide trees \n")
+  names(seq) <- seq_nam
 
   if (parallel == TRUE){
     # guide.msa <- pbmclapply(nj.guide.trees,
@@ -132,14 +161,14 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
 
     if(msa.program == "mafft"){
       guide.msa <- pbmclapply(nj.guide.trees,
-        FUN = function(x) ips::mafft(seq, gt = x, method = method),
+        FUN = function(x) mafft_AA(x = seq, gt = x, method = method),
         mc.cores = ncore, ignore.interactive = TRUE)
     }
 
     # @Christoph: prank gibt fehler:  object "phy" has no trees
     # problem liegt hier:
     # missingseqs <- which(!guidetree$tip.label %in% x$nam)
-    #x$nam müsste names(x) sein...
+    # x$nam müsste names(x) sein...
     if(msa.program == "prank"){
       guide.msa <- pbmclapply(nj.guide.trees,
         FUN = function(y) ips::prank(x = seq, guidetree = y,
@@ -167,9 +196,6 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   }
   close(pb)
 
-  # ips::mafft >> ips::mafft::phylo2mafft is creating a fasta file for the guide tree
-  ## here it is deleted
-  # @ Christoph: magst du das evtl. auskommentieren?
   mafft_created <- list.files(getwd(),
     full.names = T)[grep("tree.mafft", list.files(getwd()))]
   if(length(mafft_created)>0){
@@ -204,7 +230,10 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ####
   # HERE ADD SCORE CODE
   base.msa.t <- data.frame(t(base.msa))
-  guide.msa <- lapply(guide.msa, as.character)
+  if(inherits(seq, "DNAbin")){     guide.msa <- lapply(guide.msa, as.character) }
+  if(inherits(seq, "AAbin")){
+    guide.msa <- lapply(guide.msa, function(x) do.call(rbind, x))
+  }
   guide.msa <- lapply(guide.msa, function(x) as.data.frame(t(x)))
 
 
@@ -246,10 +275,20 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ## remove unreliable columns
   remove_cols <- gsc[,2] < cutoff
   guidance.msa <- base.msa[,!remove_cols]
-  guidance.msa <- as.DNAbin(guidance.msa)
+
+  if(mask == TRUE){
+    if(inherits(seq, "DNAbin")){     base.msa[base.msa<0.5 & base.msa!="-"] <- "N" }
+    if(inherits(seq, "AAbin")) {     base.msa[base.msa<0.5 & base.msa!="-"] <- "X"  }
+  }
+
+
+  if(inherits(seq, "DNAbin")){ guidance.msa <- as.DNAbin(guidance.msa) }
+  if(inherits(seq, "AAbin")) { guidance.msa <- as.AAbin(guidance.msa)  }
+
 
   ## prepare base.msa for output
-  base.msa <- as.DNAbin(base.msa)
+  if(inherits(seq, "DNAbin")){   base.msa <- as.DNAbin(base.msa) }
+  if(inherits(seq, "AAbin")) {   base.msa <- as.AAbin(base.msa)  }
 
   ## Produce output
   res <-  list(alignment_score = alignment_score,
