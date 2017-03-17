@@ -49,19 +49,14 @@
 #' @import phangorn
 #'
 #' @author Franz-Sebastian Krah
+#' @author Christoph Heibl
 
 guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
-  bootstrap = 100, msa.program = "mafft", method = "auto", mask = FALSE){
+  bootstrap = 100, msa.program = "mafft", method = "auto", mask = FALSE,
+  mafft_exec){
 
-  if (length(grep("\\.fas", seq))> 0){
-    seq <- read.FASTA(seq)
 
-guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
-  bootstrap = 100, msa.program = "mafft", exec, method = "auto"){
-
-  if (!is.object(seqs)){
-    seqs <- read.FASTA(seqs)
-  }
+  if (missing(mafft_exec)) mafft_exec <- "/usr/local/bin/mafft"
 
   ##############################################
   ## SOME CHECKS
@@ -69,8 +64,6 @@ guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
   if (!inherits(seq, "DNAbin") & !inherits(seq[[1]], "SeqFastaAA"))
     stop("sequences not of class DNAbin (ape) or SeqFastaAA (seqinr)")
 
-  if (!inherits(seqs, c("DNAbin", "AAbin")))
-    stop("sequences must be of class DNAbin or AAbin (ape)")
 
   ##############################################
   ## PART I
@@ -92,9 +85,9 @@ guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
   ###########################
   cat("Generating the base alignment \n")
   if (msa.program == "mafft"){
-    base.msa <- mafft_AA(seq, method = method)
-
-    base.msa <- mafft(seqs, method = method, exec = exec)
+    # base.msa <- mafft_AA(seq, method = method)
+  # C  On my MAC mafft is in /usr/local/bin/ but function is not working
+    base.msa <- mafft_AA(seq, method = method, exec = exec)
   }
   if (msa.program == "prank"){
     base.msa <- prank(seqs)
@@ -183,15 +176,11 @@ guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
   cat("  Alignment of pertubated MSAs using NJ guide trees \n")
   names(seq) <- seq_nam
 
-  if (parallel == TRUE){
-    # guide.msa <- pbmclapply(nj.guide.trees,
-    #                         function(x, m, gt) ips::mafft(x, method, gt),
-    #                         x = seq, m = method,
-    #                         mc.cores = ncore, ignore.interactive = TRUE)
-
-    if(msa.program == "mafft"){
-      guide.msa <- pbmclapply(nj.guide.trees,
-        FUN = function(x) mafft_AA(x = seq, gt = x, method = method),
+  # if (parallel == TRUE){
+#
+#   if(msa.program == "mafft"){
+#       guide.msa <- pbmclapply(nj.guide.trees,
+#         FUN = function(x) mafft_AA(x = seq, gt = x, method = method),
   if (parallel){
     if (msa.program == "mafft"){
       guide.msa <- pbmclapply(nj.guide.trees,
@@ -199,46 +188,34 @@ guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
         seqs = seqs, method = method,
         mc.cores = ncore, ignore.interactive = TRUE)
     }
+  }
 
     # @Christoph: prank gibt fehler:  object "phy" has no trees
     # problem liegt hier:
     # missingseqs <- which(!guidetree$tip.label %in% x$nam)
-<<<<<<< HEAD
     # x$nam müsste names(x) sein...
-    if(msa.program == "prank"){
-=======
-    #x$nam müsste names(x) sein...
-    if (msa.program == "prank"){
->>>>>>> origin/master
-      guide.msa <- pbmclapply(nj.guide.trees,
-        FUN = function(y) prank(x = seqs, guidetree = y,
-          path = exec),
-        mc.cores = ncore, ignore.interactive = TRUE)
-    }
+  pb <- txtProgressBar(min = 0, max = bootstrap, style = 3)
+
+  if (msa.program == "prank"){
+    guide.msa <- pbmclapply(nj.guide.trees,
+      FUN = function(y) prank(x = seqs, guidetree = y,
+        path = exec), mc.cores = ncore, ignore.interactive = TRUE)
   } else {
-    pb <- txtProgressBar(min = 0, max = bootstrap, style = 3)
     if (msa.program == "mafft"){
       guide.msa <- foreach(i = 1:bootstrap) %do% {
         mafft(x = seqs, gt = nj.guide.trees[[i]], method = method, exec = exec)
         setTxtProgressBar(pb, i)
       }
     }
-    if (msa.program == "prank"){
-      guide.msa <- foreach(i = 1:bootstrap) %do% {
-        prank(x = seqs, guidetree = nj.guide.trees[[i]],
-          path = exec)
-        setTxtProgressBar(pb, i)
-      }
-    }
   }
   close(pb)
 
-<<<<<<< HEAD
   mafft_created <- list.files(getwd(),
     full.names = T)[grep("tree.mafft", list.files(getwd()))]
   if(length(mafft_created)>0){
     file.remove(mafft_created)
-=======
+  }
+
   ## CH [2017-03-15]:
   ## Some MAFFT alignments fail. This is not a deterministic
   ## pattern: On another occasion the same dataset gets aligned
@@ -252,7 +229,6 @@ guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
     cat("  .. failed for", length(failed), "pertubations\n")
     bootstrap <- bootstrap - length(failed)
     guide.msa <- guide.msa[-failed]
->>>>>>> origin/master
   }
 
   # removing some intermediate objects not further needed
@@ -270,8 +246,6 @@ guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
   # ##############################################
 
   ####
-  # HERE ADD SCORE CODE
-<<<<<<< HEAD
   base.msa.t <- data.frame(t(base.msa))
   if(inherits(seq, "DNAbin")){     guide.msa <- lapply(guide.msa, as.character) }
   if(inherits(seq, "AAbin")){
@@ -279,11 +253,9 @@ guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
   }
   guide.msa <- lapply(guide.msa, function(x) as.data.frame(t(x)))
 
-=======
   base.msa.t <- data.frame(t(as.character(base.msa)))
   store_guide.msa <- guide.msa
   guide.msa <- lapply(guide.msa, function(x) as.data.frame(t(as.character(x))))
->>>>>>> origin/master
 
   if (parallel){
     pb <- txtProgressBar(max = bootstrap, style = 3)
@@ -292,7 +264,8 @@ guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
 
     cl <- makeCluster(ncore)
     registerDoSNOW(cl)
-    bpres <- foreach(i = 1:bootstrap, .options.snow = opts, .export = 'calc_scores') %dopar% {
+    bpres <- foreach(i = 1:bootstrap, .options.snow = opts,
+      .export = 'calc_scores') %dopar% {
       calc_scores(ref = base.msa.t, com = guide.msa[[i]], n_id = i)
     }
     stopCluster(cl)
@@ -322,7 +295,6 @@ guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
   gssc <- data.frame(row = gssc[,1], sequence_score = rowMeans(gssc[,2:ncol(gssc)]))
 
   ## remove unreliable columns
-<<<<<<< HEAD
   remove_cols <- gsc[,2] < cutoff
   guidance.msa <- base.msa[,!remove_cols]
 
@@ -330,11 +302,6 @@ guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
     if(inherits(seq, "DNAbin")){     base.msa[base.msa<0.5 & base.msa!="-"] <- "N" }
     if(inherits(seq, "AAbin")) {     base.msa[base.msa<0.5 & base.msa!="-"] <- "X"  }
   }
-
-
-  if(inherits(seq, "DNAbin")){ guidance.msa <- as.DNAbin(guidance.msa) }
-  if(inherits(seq, "AAbin")) { guidance.msa <- as.AAbin(guidance.msa)  }
-
 
   ## prepare base.msa for output
   if(inherits(seq, "DNAbin")){   base.msa <- as.DNAbin(base.msa) }
@@ -348,18 +315,6 @@ guidance <- function(seqs, cutoff = 0.93, parallel = FALSE, ncore,
     guidance_msa =guidance.msa,
     base_msa = base.msa)
 
-  ## Return output
+
   return(res)
-
-=======
-  guidance.msa <- base.msa[, gsc[, 2] > cutoff]
-
-  ## return results
-  list(alignment_score = alignment_score,
-               GUIDANCE_residue_score = grsc,
-               GUIDANCE_score = gsc,
-               GUIDANCE_sequence_score = gssc,
-               guidance_msa = guidance.msa,
-               base_msa = base.msa)
->>>>>>> origin/master
 }

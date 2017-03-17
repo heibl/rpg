@@ -11,7 +11,7 @@ library("ggplot2")
 ## DNA
 ms <- read.fas("dev/data/cortinarius_28s_ms.fas")
 set.seed(100)
-seq <- sample(ms, 200)
+seq <- sample(ms, 10)
 
 ## Amino Acids
 # suppressWarnings(
