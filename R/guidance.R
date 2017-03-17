@@ -1,6 +1,5 @@
 #' GUIDetree-based AligNment ConficencE
 #'
-#'
 #' @param seq is the raw input sequences of class DNAbin (DNA) or SeqFastaAA (AA)
 #' @param cutoff specifies a cutoff to remove unreliable columns below the cutoff
 #' @title Alignment Confidence Scores with GUIDANCE
@@ -18,7 +17,7 @@
 #' @param exec A character string giving the path to the executable of the
 #'   alignment program.
 #' @param method further arguments passed to mafft, default is "auto"
-#' @mask specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA)
+#' @param mask specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA)
 #'
 #' @return alignment_score: is the GUIDANCE alignment score
 #' @return GUIDANCE_residue_score
