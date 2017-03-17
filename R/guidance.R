@@ -40,13 +40,13 @@
 #'   robustness to guide tree uncertainty. Molecular Biology and Evolution
 #'   27:1759--1767
 #'
-#' @import ips
+#' @importFrom ips mafft
 #' @import doSNOW
 #' @import foreach
 #' @import parallel
 #' @import pbmcapply
 #' @import plyr
-#' @import phangorn
+#' @importFrom phangorn as.phyDat dist.ml
 #'
 #' @author Franz-Sebastian Krah
 #' @author Christoph Heibl
@@ -135,10 +135,10 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
     registerDoSNOW(cl)
     nj.guide.trees <- foreach(i = 1:bootstrap, .options.snow = opts) %dopar% {
       # convert to class phyDAT
-      # base.msa.ml <- phangorn::as.phyDat(base.msa.bp[[i]])
-      base.msa.ml <- phangorn::as.phyDat(as.character(base.msa.bp[[i]]))
+      # base.msa.ml <- as.phyDat(base.msa.bp[[i]])
+      base.msa.ml <- as.phyDat(as.character(base.msa.bp[[i]]))
       # find ML distance as input to nj tree search
-      ml.dist.msa <- phangorn::dist.ml(base.msa.ml)
+      ml.dist.msa <- dist.ml(base.msa.ml)
       # NJ
       ape::nj(ml.dist.msa)
     }
@@ -148,9 +148,9 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
     nj.guide.trees <- foreach(i = 1:bootstrap) %do% {
       setTxtProgressBar(pb, i)
       # convert to class phyDAT
-      base.msa.ml <- phangorn::as.phyDat(base.msa.bp[[i]])
+      base.msa.ml <- as.phyDat(base.msa.bp[[i]])
       # find ML distance as input to nj tree search
-      ml.dist.msa <- phangorn::dist.ml(base.msa.ml)
+      ml.dist.msa <- dist.ml(base.msa.ml)
       # NJ
       ape::nj(ml.dist.msa)
     }
@@ -160,7 +160,7 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
 
   ## Find NJ tree for base MSA
   ## 1st tip label of base.nj tree as outgroup for all guide.njs
-  base.nj <- ape::nj(phangorn::dist.ml(phangorn::as.phyDat(base.msa)))
+  base.nj <- ape::nj(dist.ml(as.phyDat(base.msa)))
   base.nj <- root(base.nj, outgroup = base.nj$tip.label[1])
 
   ## Root each tree on the first tip label of the base.nj tree
@@ -216,14 +216,6 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
     file.remove(mafft_created)
   }
 
-  ## CH [2017-03-15]:
-  ## Some MAFFT alignments fail. This is not a deterministic
-  ## pattern: On another occasion the same dataset gets aligned
-  ## with the same NJ guide tree. So there must be some kind of
-  ## stochastic process within MAFFT.
-  ## My rapid solution is to just delete those replicates
-  ## that failed to align. A future solution should try to rerun
-  ## the replicates until they succeed.
   failed <- which(sapply(guide.msa, is.integer))
   if (length(failed)){
     cat("  .. failed for", length(failed), "pertubations\n")
@@ -247,8 +239,10 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
 
   ####
   base.msa.t <- data.frame(t(base.msa))
-  if(inherits(seq, "DNAbin")){     guide.msa <- lapply(guide.msa, as.character) }
-  if(inherits(seq, "AAbin")){
+  if (inherits(seq, "DNAbin")){
+    guide.msa <- lapply(guide.msa, as.character)
+  }
+  if (inherits(seq, "AAbin")){
     guide.msa <- lapply(guide.msa, function(x) do.call(rbind, x))
   }
   guide.msa <- lapply(guide.msa, function(x) as.data.frame(t(x)))

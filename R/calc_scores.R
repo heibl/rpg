@@ -17,11 +17,11 @@ calc_scores <- function(ref, com, n_id = 1){
   seqinr::write.fasta(as.list(com), names = paste0("S", 1:dim(com)[1]),
     file = paste(locdir_runs, "com.fasta", sep = "/"))
 
-  system(paste(paste(locdir, "src/msa_set_score", sep ="/"),
-    paste(locdir_runs, "ref.fasta", sep="/"),
-    paste(paste("score_run", n_id, sep =""), "score_res", sep="/"),
+  system(paste(paste(locdir, "src/msa_set_score", sep = "/"),
+    paste(locdir_runs, "ref.fasta", sep = "/"),
+    paste(paste("score_run", n_id, sep = ""), "score_res", sep = "/"),
     "-m",
-    paste(paste("score_run", n_id, sep =""), "com.fasta", sep="/")))
+    paste(paste("score_run", n_id, sep = ""), "com.fasta", sep = "/")))
 
   files <- list.files(locdir_runs)
   read <- files[grep("score", files)]
