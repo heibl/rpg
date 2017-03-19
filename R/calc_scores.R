@@ -1,4 +1,4 @@
-#' Wrapper Function of C Code for Calculation of the GUIDANCE Scores
+#' Wrapper Wrapper Function for Calculation of GUIDANCE Scores
 #'
 #' @param ref of class data.frame, is the reference MSA ('BASE MSA') with sequences as columns
 #' @param com like ref, but 1 alternative ('perturbated MSA')
@@ -6,34 +6,44 @@
 #' @return list containing GUIDANCE column score, the residue score and sequence score
 #'
 #' @author Franz-Sebastian Krah
+#'
 
-calc_scores <- function(ref, com, n_id = 1){
+calc_scores <- function(ref, com){
+  # create temporary dir with temporary fasta files
+  fns <- vector(length = 2)
+  for (i in seq_along(fns))
+    fns[i] <- tempfile(pattern = "mafft", tmpdir = tempdir(), fileext = ".fas")
+  unlink(fns[file.exists(fns)])
 
-  locdir <- getwd()
-  locdir_runs <- paste0(paste(locdir, "score_run", sep ="/"), n_id)
-  dir.create(locdir_runs)
+  # store fasta files in temp files
   seqinr::write.fasta(as.list(ref), names = paste0("S", 1:dim(ref)[1]),
-    file =paste(locdir_runs, "ref.fasta", sep = "/"))
+    file = fns[1])
   seqinr::write.fasta(as.list(com), names = paste0("S", 1:dim(com)[1]),
-    file = paste(locdir_runs, "com.fasta", sep = "/"))
+    file = fns[2])
 
-  system(paste(paste(locdir, "src/msa_set_score", sep = "/"),
-    paste(locdir_runs, "ref.fasta", sep = "/"),
-    paste(paste("score_run", n_id, sep = ""), "score_res", sep = "/"),
+  ## call program msa_set_score in R package folder src/msa_set_score_src
+  system(paste(paste("src/msa_set_score_src/msa_set_score", sep ="/"),
+    fns[1],
+    paste(tempdir(), "score_result", sep ="/"),
     "-m",
-    paste(paste("score_run", n_id, sep = ""), "com.fasta", sep = "/")))
+    fns[2]))
 
-  files <- list.files(locdir_runs)
+  ## read program putput which is in temp dir
+  files <-  list.files(tempdir())
   read <- files[grep("score", files)]
   # GUIDANCE Score
-  gsc <- read.table(paste(locdir_runs, read[3], sep ="/"), header = FALSE)
+  gsc <- read.table(paste(tempdir(), read[3], sep ="/"), header = FALSE)
   # G residue score
-  grsc <- read.table(paste(locdir_runs, read[4], sep ="/"), header = FALSE)
+  grsc <- read.table(paste(tempdir(), read[4], sep ="/"), header = FALSE)
   # sequence score
-  ssc <- read.table(paste(locdir_runs, read[6], sep ="/"), header = FALSE)
+  ssc <- read.table(paste(tempdir(), read[6], sep ="/"), header = FALSE)
 
-  unlink(locdir_runs, recursive = TRUE, force = TRUE)
+  ## delete temp files
+  unlink(fns[file.exists(fns)])
+  unlink(tempdir())
 
+  # output
   res <- list(GUIDANCE_score = gsc, residue_score = grsc, sequence_score = ssc)
   return(res)
 }
+

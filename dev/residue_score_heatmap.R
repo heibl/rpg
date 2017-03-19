@@ -18,6 +18,7 @@ guidance_heatmap <- function(guidance_object, file = NULL){
 
   p <- ggplot(GRSC,aes(col, row)) +
     geom_tile(aes(fill = residue_score), colour = "white") +
+<<<<<<< Updated upstream:dev/residue_score_heatmap.R
     scale_fill_gradient(low = "red", high = "yellow") +
     scale_y_reverse() +
     ylab("Sequences (input order)") +
@@ -29,6 +30,18 @@ guidance_heatmap <- function(guidance_object, file = NULL){
           legend.title = element_text(size = 18),
           legend.text = element_text(size = 14))
 
+=======
+    scale_fill_gradient(low = "red", high = "yellow")+
+    scale_y_reverse()+
+    ylab("Sequences (input order)")+
+    xlab("Sites")+
+    guides(fill=guide_legend(title="MSA\nconfidence\nscale"))+
+    theme_bw()+
+    theme(legend.position="left")+
+    theme(plot.title = element_text(size = 20, face = "bold") ,
+      legend.title=element_text(size=18) ,
+      legend.text=element_text(size=14))
+>>>>>>> Stashed changes:R/residue_score_heatmap.R
 
   if (!is.null(file)){
     pdf(file, width = w, height = h)
@@ -38,6 +51,7 @@ guidance_heatmap <- function(guidance_object, file = NULL){
   } else {
     return(p)
   }
+<<<<<<< Updated upstream:dev/residue_score_heatmap.R
 }
 
 
@@ -68,3 +82,9 @@ guidance_heatmap <- function(guidance_object, file = NULL){
 #     keysize = 1.7,
 #     col  = hmcol)
 # }
+=======
+  if(is.null(file)){
+    print(p)
+  }
+}
+>>>>>>> Stashed changes:R/residue_score_heatmap.R

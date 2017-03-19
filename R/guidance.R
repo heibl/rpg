@@ -86,7 +86,7 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   if (msa.program == "mafft"){
     # base.msa <- mafft_AA(seq, method = method)
   # C  On my MAC mafft is in /usr/local/bin/ but function is not working
-    base.msa <- mafft_AA(seq, method = method, exec = exec)
+    base.msa <- mafft(seq, method = method, exec = mafft_exec)
   }
   if (msa.program == "prank"){
     base.msa <- prank(seqs)
@@ -183,7 +183,8 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   if (parallel){
     if (msa.program == "mafft"){
       guide.msa <- pbmclapply(nj.guide.trees,
-        function(x, seqs, method) mafft(seqs, gt = x, method = method),
+        function(x, seqs, method) mafft(seqs, gt = x,
+          method = method, exec = mafft_exec),
         seqs = seqs, method = method,
         mc.cores = ncore, ignore.interactive = TRUE)
     }

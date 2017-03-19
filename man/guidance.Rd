@@ -23,8 +23,11 @@ currelty either \code{"mafft"} (default) or\code{"prank"}.}
 
 \item{method}{further arguments passed to mafft, default is "auto"}
 
+<<<<<<< Updated upstream
 \item{mask}{specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA)}
 
+=======
+>>>>>>> Stashed changes
 \item{seqs}{An object of class \code{\link{DNAbin}} or \code{\link{AAbin}}
 containing unaligned sequences of DNA or amino acids.}
 

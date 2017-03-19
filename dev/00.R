@@ -14,9 +14,10 @@ set.seed(100)
 seq <- sample(ms, 10)
 
 ## Amino Acids
-# suppressWarnings(
-#   seq <- seqinr::read.fasta("dev/data/AATF.fas", seqtype = "AA")
-# )
+suppressWarnings(
+  seq <- seqinr::read.fasta("dev/data/AATF.fas", seqtype = "AA")
+)
+as.AAbin(as.list(seq))
 
 
 seq = seq
