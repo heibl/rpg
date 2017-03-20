@@ -2,9 +2,9 @@
 % Please edit documentation in R/calc_scores.R
 \name{calc_scores}
 \alias{calc_scores}
-\title{Wrapper Function of C Code for Calculation of the GUIDANCE Scores}
+\title{Wrapper Wrapper Function for Calculation of GUIDANCE Scores}
 \usage{
-calc_scores(ref, com, n_id = 1)
+calc_scores(ref, com)
 }
 \arguments{
 \item{ref}{of class data.frame, is the reference MSA ('BASE MSA') with sequences as columns}
@@ -17,7 +17,7 @@ calc_scores(ref, com, n_id = 1)
 list containing GUIDANCE column score, the residue score and sequence score
 }
 \description{
-Wrapper Function of C Code for Calculation of the GUIDANCE Scores
+Wrapper Wrapper Function for Calculation of GUIDANCE Scores
 }
 \author{
 Franz-Sebastian Krah

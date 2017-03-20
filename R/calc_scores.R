@@ -26,7 +26,8 @@ calc_scores <- function(ref, com){
     fns[1],
     paste(tempdir(), "score_result", sep ="/"),
     "-m",
-    fns[2]))
+    fns[2]), intern = TRUE, ignore.stdout = FALSE)
+
 
   ## read program putput which is in temp dir
   files <-  list.files(tempdir())
