@@ -60,8 +60,8 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ##############################################
   ## SOME CHECKS
   ##############################################
-  if (!inherits(seq, "DNAbin") & !inherits(seq[[1]], "SeqFastaAA"))
-    stop("sequences not of class DNAbin (ape) or SeqFastaAA (seqinr)")
+  if (!inherits(seq, "DNAbin") & !inherits(seq[[1]], "AAbin"))
+    stop("sequences not of class DNAbin or AAbin (ape)")
 
 
   ##############################################
@@ -69,37 +69,34 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ##############################################
   ## BASE and PERTUBATED MSAs
   ##############################################
-  seq_nam <- names(seq)
+  # seq_nam <- names(seq)
 
-
-  ## if AA Sequences perform data prep first
-  if(inherits(seq[[1]], "SeqFastaAA")){
-    seq <- lapply(seq, as.character)
-    seq <- rbind.fill(lapply(seq,
-      function(y) { as.data.frame(t(y), stringsAsFactors=FALSE) }))
-    seq <- as.AAbin(as.matrix(seq))
-  }
+  #
+  #   ## if AA Sequences perform data prep first
+  #   if(inherits(seq[[1]], "SeqFastaAA")){
+  #     seq <- lapply(seq, as.character)
+  #     seq <- rbind.fill(lapply(seq,
+  #       function(y) { as.data.frame(t(y), stringsAsFactors=FALSE) }))
+  #     seq <- as.AAbin(as.matrix(seq))
+  #   }
 
   ## Generate BASE alignment
   ###########################
   cat("Generating the base alignment \n")
   if (msa.program == "mafft"){
     # base.msa <- mafft_AA(seq, method = method)
-  # C  On my MAC mafft is in /usr/local/bin/ but function is not working
+    # C  On my MAC mafft is in /usr/local/bin/ but function is not working
     base.msa <- mafft(seq, method = method, exec = mafft_exec)
   }
   if (msa.program == "prank"){
     base.msa <- prank(seqs)
   }
-  if(inherits(seq, "DNAbin")){   base.msa <- as.character(base.msa) }
-  if(inherits(seq, "AAbin")){    base.msa <- do.call(rbind, base.msa) }
-
-  rownames(base.msa) <- seq_nam
-
+  ## form into matrix for perturbation
+  base.msa <- as.character(base.msa)
 
   ## Constructing BP guide-trees for the pertubated MSAs
   #######################################################
-  cat("Pertubating base alignment \n")
+  cat("Pertubating base alignment\n")
   pb <- txtProgressBar(min = 0, max = bootstrap, style = 3)
 
   if(inherits(seq, "DNAbin")){
@@ -132,19 +129,20 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
 
     cl <- makeCluster(ncore)
     registerDoSNOW(cl)
-    nj.guide.trees <- foreach(i = 1:bootstrap, .options.snow = opts) %dopar% {
-      # convert to class phyDAT
-      # base.msa.ml <- as.phyDat(base.msa.bp[[i]])
-      base.msa.ml <- as.phyDat(as.character(base.msa.bp[[i]]))
-      # find ML distance as input to nj tree search
-      ml.dist.msa <- dist.ml(base.msa.ml)
-      # NJ
-      ape::nj(ml.dist.msa)
-    }
+    nj.guide.trees <- foreach(i = 1:bootstrap,
+      .options.snow = opts, .packages = "phangorn") %dopar% {
+        # convert to class phyDAT
+        # base.msa.ml <- as.phyDat(base.msa.bp[[i]])
+        base.msa.ml <- as.phyDat(as.character(base.msa.bp[[i]]))
+        # find ML distance as input to nj tree search
+        ml.dist.msa <- dist.ml(base.msa.ml)
+        # NJ
+        ape::nj(ml.dist.msa)
+      }
     stopCluster(cl)
   }
   if (parallel == FALSE){
-    nj.guide.trees <- foreach(i = 1:bootstrap) %do% {
+    nj.guide.trees <- foreach(i = 1:bootstrap, .packages = "phangorn") %do% {
       setTxtProgressBar(pb, i)
       # convert to class phyDAT
       base.msa.ml <- as.phyDat(base.msa.bp[[i]])
@@ -173,54 +171,45 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ## Alignment of MSA BP times with new NJ guide trees
   ## -------------------------------------------------
   cat("  Alignment of pertubated MSAs using NJ guide trees \n")
-  names(seq) <- seq_nam
+  # names(seq) <- seq_nam
 
   # if (parallel == TRUE){
-#
-#   if(msa.program == "mafft"){
-#       guide.msa <- pbmclapply(nj.guide.trees,
-#         FUN = function(x) mafft_AA(x = seq, gt = x, method = method),
+  #
+  #   if(msa.program == "mafft"){
+  #       guide.msa <- pbmclapply(nj.guide.trees,
+  #         FUN = function(x) mafft_AA(x = seq, gt = x, method = method),
   if (parallel){
     if (msa.program == "mafft"){
       guide.msa <- pbmclapply(nj.guide.trees,
-        function(x, seqs, method) mafft(seqs, gt = x,
+        function(x, seq, method) mafft(seq, gt = x,
           method = method, exec = mafft_exec),
-        seqs = seqs, method = method,
+        seq = seq, method = method,
         mc.cores = ncore, ignore.interactive = TRUE)
     }
-  }
-
-    # @Christoph: prank gibt fehler:  object "phy" has no trees
-    # problem liegt hier:
-    # missingseqs <- which(!guidetree$tip.label %in% x$nam)
-    # x$nam müsste names(x) sein...
-  pb <- txtProgressBar(min = 0, max = bootstrap, style = 3)
-
-  if (msa.program == "prank"){
-    guide.msa <- pbmclapply(nj.guide.trees,
-      FUN = function(y) prank(x = seqs, guidetree = y,
-        path = exec), mc.cores = ncore, ignore.interactive = TRUE)
-  } else {
-    if (msa.program == "mafft"){
-      guide.msa <- foreach(i = 1:bootstrap) %do% {
-        mafft(x = seqs, gt = nj.guide.trees[[i]], method = method, exec = exec)
-        setTxtProgressBar(pb, i)
-      }
+    if (msa.program == "prank"){
+      guide.msa <- pbmclapply(nj.guide.trees,
+        FUN = function(x, seq, method) prank(x = seq, guidetree = x,
+          path = prank_exec), seq = seq, mc.cores = ncore, ignore.interactive = TRUE)
     }
   }
-  close(pb)
+  if (!parallel){
+    if (msa.program == "mafft"){
+      guide.msa <- lapply(nj.guide.trees,
+        function(x, seq, method) mafft(seq, gt = x,
+          method = method, exec = mafft_exec),
+        seq = seq, method = method)
+    }
+    if (msa.program == "prank"){
+      guide.msa <- lapply(nj.guide.trees,
+        FUN = function(x, seq, method) prank(x = seq, guidetree = x,
+          path = prank_exec), seq = seq)
+    }
+  }
 
   mafft_created <- list.files(getwd(),
     full.names = T)[grep("tree.mafft", list.files(getwd()))]
   if(length(mafft_created)>0){
     file.remove(mafft_created)
-  }
-
-  failed <- which(sapply(guide.msa, is.integer))
-  if (length(failed)){
-    cat("  .. failed for", length(failed), "pertubations\n")
-    bootstrap <- bootstrap - length(failed)
-    guide.msa <- guide.msa[-failed]
   }
 
   # removing some intermediate objects not further needed
@@ -237,19 +226,11 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   # ## GUIDANCE Score
   # ##############################################
 
-  ####
+  ## produce input format for msa_set_score program
+  # transfrom character matrix (sequences are columns)
   base.msa.t <- data.frame(t(base.msa))
-  if (inherits(seq, "DNAbin")){
-    guide.msa <- lapply(guide.msa, as.character)
-  }
-  if (inherits(seq, "AAbin")){
-    guide.msa <- lapply(guide.msa, function(x) do.call(rbind, x))
-  }
-  guide.msa <- lapply(guide.msa, function(x) as.data.frame(t(x)))
+  guide.msa <- lapply(guide.msa, function(x) data.frame(t(as.character(x))))
 
-  base.msa.t <- data.frame(t(as.character(base.msa)))
-  store_guide.msa <- guide.msa
-  guide.msa <- lapply(guide.msa, function(x) as.data.frame(t(as.character(x))))
 
   if (parallel){
     pb <- txtProgressBar(max = bootstrap, style = 3)
@@ -260,8 +241,8 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
     registerDoSNOW(cl)
     bpres <- foreach(i = 1:bootstrap, .options.snow = opts,
       .export = 'calc_scores') %dopar% {
-      calc_scores(ref = base.msa.t, com = guide.msa[[i]], n_id = i)
-    }
+        calc_scores(ref = base.msa.t, com = guide.msa[[i]])
+      }
     stopCluster(cl)
   }
   close(pb)
@@ -292,14 +273,19 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   remove_cols <- gsc[,2] < cutoff
   guidance.msa <- base.msa[,!remove_cols]
 
-  if(mask == TRUE){
-    if(inherits(seq, "DNAbin")){     base.msa[base.msa<0.5 & base.msa!="-"] <- "N" }
-    if(inherits(seq, "AAbin")) {     base.msa[base.msa<0.5 & base.msa!="-"] <- "X"  }
-  }
+  # if(mask == TRUE){
+  #   if(inherits(seq, "DNAbin")){     base.msa[base.msa<0.5 & base.msa!="-"] <- "N" }
+  #   if(inherits(seq, "AAbin")) {     base.msa[base.msa<0.5 & base.msa!="-"] <- "X"  }
+  # }
 
   ## prepare base.msa for output
   if(inherits(seq, "DNAbin")){   base.msa <- as.DNAbin(base.msa) }
   if(inherits(seq, "AAbin")) {   base.msa <- as.AAbin(base.msa)  }
+
+  ## prepare base.msa for output
+  if(inherits(seq, "DNAbin")){   guidance.msa <- as.DNAbin(guidance.msa) }
+  if(inherits(seq, "AAbin")) {   guidance.msa <- as.AAbin(guidance.msa)  }
+
 
   ## Produce output
   res <-  list(alignment_score = alignment_score,
@@ -308,7 +294,6 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
     GUIDANCE_sequence_score = gssc,
     guidance_msa =guidance.msa,
     base_msa = base.msa)
-
 
   return(res)
 }

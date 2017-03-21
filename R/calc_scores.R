@@ -1,4 +1,4 @@
-#' Wrapper Wrapper Function for Calculation of GUIDANCE Scores
+#' Wrapper Function for Calculation of GUIDANCE Scores
 #'
 #' @param ref of class data.frame, is the reference MSA ('BASE MSA') with sequences as columns
 #' @param com like ref, but 1 alternative ('perturbated MSA')

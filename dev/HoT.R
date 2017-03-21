@@ -34,6 +34,8 @@
 #' @import pbmcapply
 #' @import plyr
 #' @importFrom phangorn as.phyDat dist.ml
+#' @import adephylo
+#' @importFrom phytools plotTree
 #'
 #' @author Franz-Sebastian Krah
 #' @author Christoph Heibl
@@ -41,7 +43,7 @@
 
 HoT <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   msa.program = "mafft", method = "auto", mask = FALSE,
-  mafft_exec){
+  mafft_exec, plot_guide = TRUE){
 
 
   if (missing(mafft_exec)) mafft_exec <- "/usr/local/bin/mafft"
@@ -49,8 +51,8 @@ HoT <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ##############################################
   ## SOME CHECKS
   ##############################################
-  if (!inherits(seq, "DNAbin") & !inherits(seq[[1]], "SeqFastaAA"))
-    stop("sequences not of class DNAbin (ape) or SeqFastaAA (seqinr)")
+  if (!inherits(seq, "DNAbin") & !inherits(seq[[1]], "AAbin"))
+    stop("sequences not of class DNAbin or AAbin (ape)")
 
 
   ##############################################
@@ -76,23 +78,37 @@ HoT <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   }
 
   ## calculate start guide tree
-  base.msa.ml <- as.phyDat(as.character(base.msa))
+  base.msa_mat <- do.call(rbind,as.character(base.msa))
+  base.msa.ml <- as.phyDat(base.msa_mat)
   # find ML distance as input to nj tree search
   ml.dist.msa <- dist.ml(base.msa.ml)
   # NJ
   start_tree <- ape::nj(ml.dist.msa)
   start_tree <- multi2di(start_tree)
   start_tree <- compute.brlen(start_tree)
-  plot(start_tree)
 
   ## produce MSA partitions
   align_parts <- partitions(start_tree)
 
+  # plot guide tree
+  if(plot_guide){
+    phytools::plotTree(start_tree)
+    legend("bottomleft",
+      paste(Ntip(start_tree)," tips","; ",
+        Ntip(start_tree)-3, " partitions", sep =""),
+      bty = "n")
+  }
 
   # alternative alingments
   alt_msas <- foreach(i = 1:(Ntip(start_tree)-3)) %do% {
-    align_part_set(input_seq = seq, align_parts[,i])
+    align_part_set(input_seq = seq, partition_set = align_parts[,i],
+      method = method, mafft_exec = mafft_exec)
   }
+  # if(parallel){
+  #   alt_msas <- pbmclapply(align_parts, FUN = align_part_set,
+  #     input_seq = seq, method = method, mafft_exec = mafft_exec,
+  #     ncore = ncore)
+  # }
 
   alt_msas <- foreach(i = 1:length(alt_msas), .combine = c) %do% {
     alt_msas[[i]]
@@ -111,15 +127,16 @@ HoT <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
 
   ####
 
-  if (inherits(seq, "DNAbin")){
-    alt_msas <- lapply(alt_msas, as.character)
-  }
-  # if (inherits(seq, "AAbin")){
-  #   alt_msas <- lapply(alt_msas, function(x) do.call(rbind, x))
-  # }
+  alt_msas <- lapply(alt_msas, as.character)
+
+
 
   alt_msas <- lapply(alt_msas, function(x) as.data.frame(t(x)))
   base.msa.t <- data.frame(t(as.character(base.msa)))
+
+  base.msa <- data.frame(t(do.call(rbind, as.character(base.msa))))
+
+  lapply(alt_msas, function(x) data.frame(t(do.call(rbind, as.character(x)))))
 
   ## match sequence names
   for(i in 1:length(alt_msas)){

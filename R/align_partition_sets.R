@@ -35,19 +35,20 @@ partitions <- function(tree){
 
 # Reverse DNA sequences
 rev_DNA <- function(x){
-  x <- as.character(x)
-  if(inherits(x, "list")) {
-    rev <- as.DNAbin(lapply(x, rev))
-  }else{
-    x <- as.list(as.data.frame(t(x)))
-    rev <- as.DNAbin(lapply(x, function(y) rev(as.character(y))))
+  if(inherits(x, "DNAbin")) {
+    rev <- as.DNAbin(lapply(x, function(y) rev(as.character(x))))
+  }
+  if(inherits(x, "AAbin")){
+    rev <- lapply(x, function(y) rev(as.character(y)))
+    rev <- as.AAbin(rev)
   }
   return(rev)
 }
 
-# Produce alternative MSAs from starting tree
-align_part_set <- function(input_seq, partition_set){
 
+# Produce alternative MSAs from starting tree
+align_part_set <- function(input_seq, partition_set, mafft_exec, method){
+  seq <- input_seq
   seq_left <- seq[partition_set>0]
   seq_right <- seq[partition_set==0]
 
@@ -56,8 +57,8 @@ align_part_set <- function(input_seq, partition_set){
     headsA <-  seq_left
     tailsA <- rev_DNA(seq_left)
   }else{
-    headsA <- mafft(seq_left)
-    tailsA <- mafft(rev_DNA(seq_left))
+    headsA <- mafft(seq_left, exec = mafft_exec, method = method)
+    tailsA <- mafft(rev_DNA(seq_left), exec = mafft_exec, method = method)
   }
 
   ## Aligning right HEADS and TAILS
@@ -65,21 +66,25 @@ align_part_set <- function(input_seq, partition_set){
     headsB <-  seq_right
     tailsB <- rev_DNA(seq_right)
   }else{
-    headsB <- mafft(seq_right)
-    tailsB <- mafft(rev_DNA(seq_right))
+    headsB <- mafft(seq_right, exec = mafft_exec, method = method)
+    tailsB <- mafft(rev_DNA(seq_right), exec = mafft_exec, method = method)
   }
 
   # aling 4 combinations of the basic MSAs (heads) and also
   # align in revers direction (tails)
 
   # headsA - headsB - HEADS
-  msa1 <- mafft(headsA, headsB, add = "add",
+  msa1 <- mafft(x = headsA, y = headsB, add = "add",
     method= method, exec = mafft_exec)
   # headsA - headsB - TAILS
   msa2 <- mafft(rev_DNA(headsA), rev_DNA(headsB), add = "add",
     method= method, exec = mafft_exec)
   msa2 <- rev_DNA(msa2)
+  if(inherits(seq, "DNAbin")){
   msa2 <- as.DNAbin(do.call(rbind, as.character(msa2)))
+  }else{
+    msa2 <- as.AAbin(do.call(rbind, as.character(msa2)))
+  }
 
   # headsA - tailsB - HEADS
   msa3 <- mafft(headsA, rev_DNA(tailsB), add = "add",
@@ -88,7 +93,11 @@ align_part_set <- function(input_seq, partition_set){
   msa4 <- mafft(rev_DNA(headsA), tailsB, add = "add",  # rev(rev())=> normal
     method= method, exec = mafft_exec)
   msa4 <- rev_DNA(msa4)
-  msa4 <- as.DNAbin(do.call(rbind, as.character(msa4)))
+  if(inherits(seq, "DNAbin")){
+    msa4 <- as.DNAbin(do.call(rbind, as.character(msa4)))
+  }else{
+    msa4 <- as.AAbin(do.call(rbind, as.character(msa4)))
+  }
 
   # tailsA - headsB - HEADS
   msa5 <- mafft(rev_DNA(tailsA), headsB, add = "add",
@@ -97,7 +106,11 @@ align_part_set <- function(input_seq, partition_set){
   msa6 <- mafft(tailsA, rev_DNA(headsB), add = "add",
     method= method, exec = mafft_exec)
   msa6 <- rev_DNA(msa6)
-  msa6 <- as.DNAbin(do.call(rbind, as.character(msa6)))
+  if(inherits(seq, "DNAbin")){
+    msa6 <- as.DNAbin(do.call(rbind, as.character(msa6)))
+  }else{
+    msa6 <- as.AAbin(do.call(rbind, as.character(msa6)))
+  }
 
   # tailsA - tailsB - HEADS
   msa7 <- mafft(rev_DNA(tailsA), rev_DNA(tailsB), add = "add",
@@ -105,8 +118,11 @@ align_part_set <- function(input_seq, partition_set){
   msa8 <- mafft(tailsA, tailsB, add = "add",
     method= method, exec = mafft_exec)
   msa8 <- rev_DNA(msa8)
-  msa8 <- as.DNAbin(do.call(rbind, as.character(msa8)))
-
+  if(inherits(seq, "DNAbin")){
+    msa8 <- as.DNAbin(do.call(rbind, as.character(msa8)))
+  }else{
+    msa8 <- as.AAbin(do.call(rbind, as.character(msa8)))
+  }
 
   comb_msas <- list(msa1, msa2, msa3, msa4,
     msa5, msa6, msa7, msa8)

@@ -5,10 +5,10 @@
 #'
 #' @author Franz-Sebastian Krah
 
-guidance_heatmap <- function(guidance_object, file = NULL){
+guidance_heatmap <- function(guidance_obj, file = NULL){
 
-  txt <- as.vector(as.character(test$base_msa))
-  GRSC <- data.frame(guidance_object$GUIDANCE_residue_score, txt)
+  txt <- as.vector(as.character(guidance_obj$base_msa))
+  GRSC <- data.frame(guidance_obj$GUIDANCE_residue_score, txt)
   rown <- dim(guidance_obj$GUIDANCE_sequence_score)[1]
   coln <- dim(guidance_obj$GUIDANCE_residue_score)[1]/rown
   w <- coln/10
@@ -20,12 +20,13 @@ guidance_heatmap <- function(guidance_object, file = NULL){
     scale_y_reverse()+
     ylab("Sequences (input order)")+
     xlab("Sites")+
-    guides(fill=guide_legend(title="MSA\nconfidence\nscale"))+
+    guides(fill=guide_legend(title="MSA confidence scale\n 1=high confidence")) +
     theme_bw()+
-    theme(legend.position="left")+
-    theme(plot.title = element_text(size = 20, face = "bold") ,
-      legend.title=element_text(size=18) ,
-      legend.text=element_text(size=14))
+    theme(legend.title=element_text(size=18) ,
+      legend.text=element_text(size=14),
+      legend.position="top",
+      legend.direction="horizontal")
+
 
   if(!is.null(file)){
     pdf(file, width = w, height = h)
