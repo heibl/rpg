@@ -19,7 +19,7 @@
 #' @return sequence_reliability
 #' @return column_reliability
 #' @return HoT_MSA: is the base MSA removed from unreliable columns below
-#'   \coe{cutoff}
+#'   \code{cutoff}
 #' @return base_msa
 #'
 #' @details Calculates column reliability by comparing alternative
@@ -39,6 +39,7 @@
 #'
 #' @author Franz-Sebastian Krah
 #' @author Christoph Heibl
+#' @export
 
 
 HoT <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
@@ -62,14 +63,6 @@ HoT <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ##############################################
   # seq_nam <- names(seq)
 
-  ## if AA Sequences perform data prep first
-  # if(inherits(seq[[1]], "SeqFastaAA")){
-  #   seq <- lapply(seq, as.character)
-  #   seq <- rbind.fill(lapply(seq,
-  #     function(y) { as.data.frame(t(y), stringsAsFactors=FALSE) }))
-  #   seq <- as.AAbin(as.matrix(seq))
-  # }
-
   ## Generate BASE MSA
   if (msa.program == "mafft"){
     # base.msa <- mafft_AA(seq, method = method)
@@ -78,17 +71,13 @@ HoT <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   }
 
   ## calculate start guide tree
-  base.msa_mat <- do.call(rbind,as.character(base.msa))
-  base.msa.ml <- as.phyDat(base.msa_mat)
+  base.msa.ml <- as.phyDat(base.msa)
   # find ML distance as input to nj tree search
   ml.dist.msa <- dist.ml(base.msa.ml)
   # NJ
   start_tree <- ape::nj(ml.dist.msa)
   start_tree <- multi2di(start_tree)
   start_tree <- compute.brlen(start_tree)
-
-  ## produce MSA partitions
-  align_parts <- partitions(start_tree)
 
   # plot guide tree
   if(plot_guide){
@@ -99,17 +88,35 @@ HoT <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
       bty = "n")
   }
 
-  # alternative alingments
-  alt_msas <- foreach(i = 1:(Ntip(start_tree)-3)) %do% {
-    align_part_set(input_seq = seq, partition_set = align_parts[,i],
-      method = method, mafft_exec = mafft_exec)
-  }
-  # if(parallel){
-  #   alt_msas <- pbmclapply(align_parts, FUN = align_part_set,
-  #     input_seq = seq, method = method, mafft_exec = mafft_exec,
-  #     ncore = ncore)
-  # }
+  ## produce MSA partitions
+  align_parts <- partitions(start_tree)
 
+  # alternative alingments
+  if (parallel){
+  pb <- txtProgressBar(max = (Ntip(start_tree)-3), style = 3)
+  progress <- function(n) setTxtProgressBar(pb, n)
+  opts <- list(progress = progress)
+
+  cl <- makeCluster(ncore)
+  registerDoSNOW(cl)
+  alt_msas <- foreach(i = 1:(Ntip(start_tree)-3),
+    .options.snow = opts, .packages = "ips") %dopar% {
+      align_part_set(input_seq = seq, partition_set = align_parts[,i],
+        method = method, mafft_exec = mafft_exec)
+    }
+  stopCluster(cl)
+  }
+  if (!parallel){
+    pb <- txtProgressBar(min = 0, max = (Ntip(start_tree)-3), style = 3)
+    alt_msas <- foreach(i = 1:(Ntip(start_tree)-3)) %do% {
+      setTxtProgressBar(pb, i)
+      align_part_set(input_seq = seq, partition_set = align_parts[,i],
+        method = method, mafft_exec = mafft_exec)
+    }
+  }
+  close(pb)
+
+  ## unlist
   alt_msas <- foreach(i = 1:length(alt_msas), .combine = c) %do% {
     alt_msas[[i]]
   }
@@ -126,21 +133,13 @@ HoT <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   # ##############################################
 
   ####
-
-  alt_msas <- lapply(alt_msas, as.character)
-
-
-
-  alt_msas <- lapply(alt_msas, function(x) as.data.frame(t(x)))
   base.msa.t <- data.frame(t(as.character(base.msa)))
-
-  base.msa <- data.frame(t(do.call(rbind, as.character(base.msa))))
-
-  lapply(alt_msas, function(x) data.frame(t(do.call(rbind, as.character(x)))))
+  alt_msas <- lapply(alt_msas, function(x) data.frame(t(as.character(x))))
 
   ## match sequence names
   for(i in 1:length(alt_msas)){
-    alt_msas[[i]] <- alt_msas[[i]][,match(colnames(base.msa.t), colnames(alt_msas[[i]]))]
+    alt_msas[[i]] <- alt_msas[[i]][,match(colnames(base.msa.t),
+      colnames(alt_msas[[i]]))]
   }
 
   if (parallel){
@@ -189,13 +188,6 @@ HoT <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   #   if(inherits(seq, "AAbin")) {     base.msa[###<0.5 & base.msa!="-"] <- "X"  }
   # }
 
-  ## prepare base.msa for output
-  if(inherits(seq, "DNAbin")){   base.msa <- as.DNAbin(base.msa) }
-  if(inherits(seq, "AAbin")) {   base.msa <- as.AAbin(base.msa)  }
-
-  ## prepare base.msa for output
-  if(inherits(seq, "DNAbin")){   HoT.msa <- as.DNAbin(HoT.msa) }
-  if(inherits(seq, "AAbin")) {   HoT.msa <- as.AAbin(HoT.msa)  }
 
   res <-  list(alignment_reliability = alignment_reliability,
     residue_reliability = rrb,

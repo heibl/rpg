@@ -6,7 +6,7 @@
 #' @return list containing GUIDANCE column score, the residue score and sequence score
 #'
 #' @author Franz-Sebastian Krah
-#'
+#' @export
 
 calc_scores <- function(ref, com){
   # create temporary dir with temporary fasta files

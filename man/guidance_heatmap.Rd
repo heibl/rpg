@@ -2,7 +2,7 @@
 % Please edit documentation in R/residue_score_heatmap.R
 \name{guidance_heatmap}
 \alias{guidance_heatmap}
-\title{Plot GUIDANCE Residue Scores and Alignment}
+\title{Plot GUIDANCE Residue Scores}
 \usage{
 guidance_heatmap(guidance_object, file = NULL)
 }
@@ -12,7 +12,7 @@ guidance_heatmap(guidance_object, file = NULL)
 \item{file}{if a dir path is supplied, the alignment is stored in a pdf, if file=NULL (default) alignment is plotted in R}
 }
 \description{
-Plot GUIDANCE Residue Scores and Alignment
+Plots a heatmap of GUIDANCE residue scores
 }
 \author{
 Franz-Sebastian Krah

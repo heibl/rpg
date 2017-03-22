@@ -1,40 +1,83 @@
-#' Plot GUIDANCE Residue Scores and Alignment
-#'
+#' @title Plot GUIDANCE Residue Scores
+#' @description Plots a heatmap of GUIDANCE residue scores
 #' @param guidance_object is simply the output object of guidance
 #' @param file if a dir path is supplied, the alignment is stored in a pdf, if file=NULL (default) alignment is plotted in R
 #'
 #' @author Franz-Sebastian Krah
+#' @importFrom ggplot2 ggplot
+#' @export
 
-guidance_heatmap <- function(guidance_obj, file = NULL){
+guidance_heatmap <- function(guidance_object, file = NULL){
 
-  txt <- as.vector(as.character(guidance_obj$base_msa))
-  GRSC <- data.frame(guidance_obj$GUIDANCE_residue_score, txt)
+  txt <- as.vector(as.character(test$base_msa))
+  GRSC <- data.frame(guidance_object$GUIDANCE_residue_score, txt)
   rown <- dim(guidance_obj$GUIDANCE_sequence_score)[1]
   coln <- dim(guidance_obj$GUIDANCE_residue_score)[1]/rown
   w <- coln/10
   h <- rown/4
 
-  p <- ggplot(GRSC, aes(col, row)) +
+  p <- ggplot(GRSC,aes(col, row)) +
     geom_tile(aes(fill = residue_score), colour = "white") +
+    scale_fill_gradient(low = "red", high = "yellow") +
+    scale_y_reverse() +
+    ylab("Sequences (input order)") +
+    xlab("Sites") +
+    guides(fill = guide_legend(title="MSA\nconfidence\nscale")) +
+    theme_bw() +
+    theme(legend.position="left") +
+    theme(plot.title = element_text(size = 20, face = "bold"),
+          legend.title = element_text(size = 18),
+          legend.text = element_text(size = 14))+
     scale_fill_gradient(low = "red", high = "yellow")+
     scale_y_reverse()+
     ylab("Sequences (input order)")+
     xlab("Sites")+
-    guides(fill=guide_legend(title="MSA confidence scale\n 1=high confidence")) +
+    guides(fill=guide_legend(title="MSA\nconfidence\nscale"))+
     theme_bw()+
-    theme(legend.title=element_text(size=18) ,
-      legend.text=element_text(size=14),
-      legend.position="top",
-      legend.direction="horizontal")
+    theme(legend.position="left")+
+    theme(plot.title = element_text(size = 20, face = "bold") ,
+      legend.title=element_text(size=18) ,
+      legend.text=element_text(size=14))
 
-
-  if(!is.null(file)){
+  if (!is.null(file)){
     pdf(file, width = w, height = h)
-    p <- p + geom_text(data=GRSC,aes(label = txt))
+    p <- p + geom_text(data = GRSC, aes(label = txt))
     print(p)
     dev.off()
-  }
-  if(is.null(file)){
-    print(p)
+  } else {
+    return(p)
   }
 }
+
+
+
+# guidance_score_heatmap <- function(guidance_obj, gap.col ="white"){
+#   rown <- dim(guidance_obj$GUIDANCE_sequence_score)[1]
+#   coln <- dim(guidance_obj$GUIDANCE_residue_score)[1]/rown
+#   msa <- matrix(guidance_obj$GUIDANCE_residue_score, nrow = rown, ncol = coln)
+#   hmcol<-brewer.pal(11,"RdYlBu")
+#   require("gplots")
+#   heatmap.2(msa,
+#     # if(print.base)
+#     # cellnote=mat2,
+#     dendrogram = "none",
+#     labRow = labels(guidance_obj$base_msa),
+#     labCol = "",
+#     Rowv = FALSE,
+#     Colv = FALSE,
+#     notecex=1.0,
+#     notecol="black",
+#     na.color=gap.col,
+#     trace = "none",
+#     key = T,
+#     key.title = "MSA confidence\nscale",
+#     key.ylab = "",
+#     key.xlab = "Uncertain <---> Conficent",
+#     density.info = "density",
+#     keysize = 1.7,
+#     col  = hmcol)
+# }
+#   if(is.null(file)){
+#     print(p)
+#   }
+# }

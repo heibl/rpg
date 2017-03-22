@@ -69,16 +69,6 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ##############################################
   ## BASE and PERTUBATED MSAs
   ##############################################
-  # seq_nam <- names(seq)
-
-  #
-  #   ## if AA Sequences perform data prep first
-  #   if(inherits(seq[[1]], "SeqFastaAA")){
-  #     seq <- lapply(seq, as.character)
-  #     seq <- rbind.fill(lapply(seq,
-  #       function(y) { as.data.frame(t(y), stringsAsFactors=FALSE) }))
-  #     seq <- as.AAbin(as.matrix(seq))
-  #   }
 
   ## Generate BASE alignment
   ###########################

@@ -2,7 +2,7 @@
 % Please edit documentation in R/calc_scores.R
 \name{calc_scores}
 \alias{calc_scores}
-\title{Wrapper Wrapper Function for Calculation of GUIDANCE Scores}
+\title{Wrapper Function for Calculation of GUIDANCE Scores}
 \usage{
 calc_scores(ref, com)
 }
@@ -17,7 +17,7 @@ calc_scores(ref, com)
 list containing GUIDANCE column score, the residue score and sequence score
 }
 \description{
-Wrapper Wrapper Function for Calculation of GUIDANCE Scores
+Wrapper Function for Calculation of GUIDANCE Scores
 }
 \author{
 Franz-Sebastian Krah
