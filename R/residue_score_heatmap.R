@@ -1,43 +1,51 @@
 #' @title Plot GUIDANCE Residue Scores
 #' @description Plots a heatmap of GUIDANCE residue scores
-#' @param guidance_object is simply the output object of guidance
-#' @param file if a dir path is supplied, the alignment is stored in a pdf, if file=NULL (default) alignment is plotted in R
+#' @param obj is the output object of guidance
+#' @param file if a path is supplied, the alignment is stored in a pdf, if file=NULL (default) alignment is promted in R
 #'
 #' @author Franz-Sebastian Krah
 #' @importFrom ggplot2 ggplot
 #' @export
 
-guidance_heatmap <- function(guidance_object, file = NULL){
+heatmap.msa <- function(obj, file = NULL){
 
-  txt <- as.vector(as.character(test$base_msa))
-  GRSC <- data.frame(guidance_object$GUIDANCE_residue_score, txt)
-  rown <- dim(guidance_obj$GUIDANCE_sequence_score)[1]
-  coln <- dim(guidance_obj$GUIDANCE_residue_score)[1]/rown
+  hot <- grep("reliability", names(obj)[1])
+  guid <- grep("confidence", names(obj)[1])
+
+  txt <- as.vector(as.character(obj$base_msa))
+
+  if(length(guid) > 1){
+    mat <- data.frame(obj$GUIDANCE_residue_score, txt)
+    rown <- dim(obj$GUIDANCE_sequence_score)[1]
+    coln <- dim(obj$GUIDANCE_residue_score)[1]/rown
+  }
+  if(length(hot) > 1){
+    mat <- data.frame(obj$residue_reliability, txt)
+    rown <- dim(obj$sequence_reliability)[1]
+    coln <- dim(obj$column_reliability)[1]/rown
+  }
+
   w <- coln/10
   h <- rown/4
 
-  p <- ggplot(GRSC,aes(col, row)) +
+  p <- ggplot(mat,aes(col, row)) +
     geom_tile(aes(fill = residue_score), colour = "white") +
     scale_fill_gradient(low = "red", high = "yellow") +
-    scale_y_reverse() +
     ylab("Sequences (input order)") +
     xlab("Sites") +
-    guides(fill = guide_legend(title="MSA\nconfidence\nscale")) +
-    theme_bw() +
-    theme(legend.position="left") +
     theme(plot.title = element_text(size = 20, face = "bold"),
           legend.title = element_text(size = 18),
           legend.text = element_text(size = 14))+
-    scale_fill_gradient(low = "red", high = "yellow")+
     scale_y_reverse()+
     ylab("Sequences (input order)")+
     xlab("Sites")+
-    guides(fill=guide_legend(title="MSA\nconfidence\nscale"))+
     theme_bw()+
     theme(legend.position="left")+
-    theme(plot.title = element_text(size = 20, face = "bold") ,
-      legend.title=element_text(size=18) ,
-      legend.text=element_text(size=14))
+    theme(legend.title=element_text(size=18) ,
+      legend.text=element_text(size=14),
+      legend.position="top",
+      legend.direction="horizontal")+
+    guides(fill=guide_legend(title="MSA confidence scale (1=high)"))
 
   if (!is.null(file)){
     pdf(file, width = w, height = h)

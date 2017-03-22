@@ -54,10 +54,9 @@ rev_DNA <- function(x){
 
 
 # Produce alternative MSAs from starting tree
-align_part_set <- function(input_seq, partition_set, mafft_exec, method){
-  seq <- input_seq
-  seq_left <- seq[partition_set>0]
-  seq_right <- seq[partition_set==0]
+align_part_set <- function(x, partition_set, mafft_exec, method){
+  seq_left <- x[partition_set>0]
+  seq_right <- x[partition_set==0]
 
   ## Aligning left HEADS and TAILS
   if (length(seq_left) == 1){

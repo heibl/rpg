@@ -18,8 +18,9 @@ seq_dna <- sample(ms, 10)
 seq_aa <- read.fas("dev/data/AATF.fas", type ="AA")
 
 
+
 # seq = seq_dna
-seq = seq_aa
+sequences = seq_aa
 ncore = 2
 bootstrap = 100
 msa.program = "mafft"
@@ -30,6 +31,7 @@ mask = FALSE
 mafft_exec <- "/usr/local/bin/mafft"
 plot_guide = TRUE
 
+library("rpg")
 # system.time(g_msa <- guidance(seq = seq,
 #                                 ncore = 2,
 #                                 bootstrap = 100,
@@ -39,16 +41,19 @@ plot_guide = TRUE
 #                                 cutoff = 0.93,
 #                                 mask = FALSE))
 
-# guidance_heatmap(g_msa, file ="dev/data/test_msa_plot.pdf")
+# heatmap.msa(g_msa, file ="dev/data/test_msa_plot.pdf")
 # system("open dev/data/test_msa_plot.pdf")
-# guidance_heatmap(guidance_obj = g_msa)
+# heatmap.msa(g_msa)
 
-library("rpg")
-system.time(hot_msa <- HoT(seq = seq,
-  ncore = 2,
+
+
+system.time(hot_msa <- HoT(sequences = seq_aa,
+  ncore = 4,
   msa.program = "mafft",
   method = "auto",
-  parallel  = FALSE,
+  parallel  = TRUE,
   cutoff = 0.93,
   mask = FALSE,
   plot_guide = TRUE))
+
+heatmap.msa(obj = hot_msa)
