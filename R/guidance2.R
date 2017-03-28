@@ -49,6 +49,7 @@
 #'
 #' @author Franz-Sebastian Krah
 #' @author Christoph Heibl
+#' @export
 
 guidance2 <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   bootstrap = 400, HoT.samples = 4, msa.program = "mafft",

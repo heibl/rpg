@@ -91,6 +91,7 @@ HoT <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
   ## produce MSA partitions
   align_parts <- partitions(start_tree)
 
+
   # alternative alingments
   if (parallel){
   pb <- txtProgressBar(max = (Ntip(start_tree)-3), style = 3)

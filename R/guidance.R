@@ -49,6 +49,7 @@
 #'
 #' @author Franz-Sebastian Krah
 #' @author Christoph Heibl
+#' @export
 
 guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   bootstrap = 100, msa.program = "mafft", method = "auto", mask = FALSE,
@@ -60,7 +61,7 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ##############################################
   ## SOME CHECKS
   ##############################################
-  if (!inherits(seq, "DNAbin") & !inherits(seq[[1]], "AAbin"))
+  if (!inherits(seq, "DNAbin", "AAbin"))
     stop("sequences not of class DNAbin or AAbin (ape)")
 
 
@@ -72,15 +73,14 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
 
   ## Generate BASE alignment
   ###########################
-  cat("Generating the base alignment \n")
+  cat("Generating the base alignment")
   if (msa.program == "mafft"){
-    # base.msa <- mafft_AA(seq, method = method)
-    # C  On my MAC mafft is in /usr/local/bin/ but function is not working
     base.msa <- mafft(seq, method = method, exec = mafft_exec)
   }
   if (msa.program == "prank"){
     base.msa <- prank(seqs)
   }
+  cat("... done \n")
   ## form into matrix for perturbation
   base.msa <- as.character(base.msa)
 
@@ -103,8 +103,6 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
       return(pertubatedMSA)
     }
   }
-
-
 
   ## Generating alternative (pertubated) MSAs
   ###########################################
@@ -161,13 +159,7 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ## Alignment of MSA BP times with new NJ guide trees
   ## -------------------------------------------------
   cat("  Alignment of pertubated MSAs using NJ guide trees \n")
-  # names(seq) <- seq_nam
 
-  # if (parallel == TRUE){
-  #
-  #   if(msa.program == "mafft"){
-  #       guide.msa <- pbmclapply(nj.guide.trees,
-  #         FUN = function(x) mafft_AA(x = seq, gt = x, method = method),
   if (parallel){
     if (msa.program == "mafft"){
       guide.msa <- pbmclapply(nj.guide.trees,
