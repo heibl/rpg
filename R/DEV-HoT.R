@@ -42,17 +42,20 @@
 #' @export
 
 
-HoT <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
+HoT_dev <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
   msa.program = "mafft", method = "auto", mask = FALSE,
-  mafft_exec, plot_guide = TRUE){
+  mafft_exec, prank_exec, plot_guide = TRUE, n.part = "auto"){
+
 
 
   if (missing(mafft_exec)) mafft_exec <- "/usr/local/bin/mafft"
+  if (missing(prank_exec)) prank_exec <- "/usr/local/bin/prank"
+
 
   ##############################################
   ## SOME CHECKS
   ##############################################
-  if (!inherits(sequences, "DNAbin") & !inherits(sequences[[1]], "AAbin"))
+  if (!inherits(sequences, c("DNAbin","AAbin")))
     stop("sequencesuences not of class DNAbin or AAbin (ape)")
 
 
@@ -61,15 +64,14 @@ HoT <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
   ##############################################
   ## BASE and alternative MSAs
   ##############################################
-  # sequences_nam <- names(sequences)
-
-  ## Generate BASE MSA
+  cat("Generating the base alignment")
+  ## MAFFT
   if (msa.program == "mafft"){
-    # base.msa <- mafft_AA(sequences, method = method)
-    # C  On my MAC mafft is in /usr/local/bin/ but function is not working
     base.msa <- mafft(sequences, method = method, exec = mafft_exec)
   }
+  cat("... done \n")
 
+  cat("Calculate start tree")
   ## calculate start guide tree
   base.msa.ml <- as.phyDat(base.msa)
   # find ML distance as input to nj tree search
@@ -87,31 +89,51 @@ HoT <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
         Ntip(start_tree)-3, " partitions", sep =""),
       bty = "n")
   }
+  cat("... done \n")
 
   ## produce MSA partitions
   align_parts <- partitions(start_tree)
 
-
-  # alternative alingments
-  if (parallel){
-  pb <- txtProgressBar(max = (Ntip(start_tree)-3), style = 3)
-  # progress <- function(n) setTxtProgressBar(pb, n)
-  # opts <- list(progress = progress)
-
-  cl <- makeCluster(ncore)
-  registerDoSNOW(cl)
-  alt_msas <- list()
-  for(i in 1:(Ntip(start_tree)-3)){ ## foreach does not work
-    setTxtProgressBar(pb, i)
-    alt_msas[[i]] <- align_part_set(x = sequences,
-      partition_set = align_parts[,i],
-      method = method, mafft_exec = mafft_exec)
+  ## subsample of partitions (co-optimal solutions)
+  if(n.part == "auto"){
+    nt <- Ntip(start_tree)
+    if(nt>40){
+      npart <- nt*0.1
+    }else{
+      npart <- ncol(align_parts)
+    }
+    align_parts <- sample(align_parts, npart)
+  }else{
+    align_parts <- sample(align_parts, n.part)
   }
-  stopCluster(cl)
+
+
+  ##############################################
+  ## PART II
+  ##############################################
+  ## Co-optimal MSAs
+  ##############################################
+  cat("Generating co-optimal alignments \n")
+
+  if (parallel){
+    pb <- txtProgressBar(max = ncol(align_parts), style = 3)
+    # progress <- function(n) setTxtProgressBar(pb, n)
+    # opts <- list(progress = progress)
+
+    cl <- makeCluster(ncore)
+    registerDoSNOW(cl)
+    alt_msas <- list()
+    for(i in 1:ncol(align_parts)){ ## foreach does not work
+      setTxtProgressBar(pb, i)
+      alt_msas[[i]] <- align_part_set(x = sequences,
+        partition_set = align_parts[,i],
+        method = method, mafft_exec = mafft_exec)
+    }
+    stopCluster(cl)
   }
   if (!parallel){
-    pb <- txtProgressBar(min = 0, max = (Ntip(start_tree)-3), style = 3)
-    alt_msas <- foreach(i = 1:(Ntip(start_tree)-3)) %do% {
+    pb <- txtProgressBar(min = 0, max = ncol(align_parts), style = 3)
+    alt_msas <- foreach(i = 1:ncol(align_parts)) %do% {
       setTxtProgressBar(pb, i)
       align_part_set(x = sequences, partition_set = align_parts[,i],
         method = method, mafft_exec = mafft_exec)
@@ -123,7 +145,6 @@ HoT <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
     }
   }
   close(pb)
-
   ## unlist
   alt_msas <- foreach(i = 1:length(alt_msas), .combine = c) %do% {
     alt_msas[[i]]
@@ -131,16 +152,13 @@ HoT <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
 
 
   ##############################################
-  ## PART II
+  ## PART III
   ##############################################
-  ## Computation of GUIDANCE scores
+  ## Computation of reliability scores
   ##############################################
-  cat("Calculating GUIDANCE scores \n")
+  cat("Calculating reliability scores \n")
 
-  # ## GUIDANCE Score
-  # ##############################################
-
-  ####
+  ## Transform MSAs for input to *msa_set_score*
   base.msa.t <- data.frame(t(as.character(base.msa)))
   alt_msas <- lapply(alt_msas, function(x) data.frame(t(as.character(x))))
 
@@ -149,7 +167,8 @@ HoT <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
     alt_msas[[i]] <- alt_msas[[i]][,match(colnames(base.msa.t),
       colnames(alt_msas[[i]]))]
   }
-  ##
+
+  ## Run comparison
   if (!parallel){
     pb <- txtProgressBar(max = length(alt_msas), style = 3)
     altres <- foreach(i = 1:length(alt_msas),

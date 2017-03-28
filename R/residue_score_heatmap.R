@@ -9,22 +9,22 @@
 
 heatmap.msa <- function(obj, file = NULL){
 
-  hot <- grep("reliability", names(obj)[1])
-  guid <- grep("confidence", names(obj)[1])
+  hot <- grep("reliability", names(obj))
+  guid <- grep("GUIDANCE", names(obj))
 
   txt <- as.vector(as.character(obj$base_msa))
 
-  if(length(guid) > 1){
+  if(length(guid) > 0){
     mat <- data.frame(obj$GUIDANCE_residue_score, txt)
     rown <- dim(obj$GUIDANCE_sequence_score)[1]
     coln <- dim(obj$GUIDANCE_residue_score)[1]/rown
-  }
-  if(length(hot) > 1){
+  }else{
     mat <- data.frame(obj$residue_reliability, txt)
     rown <- dim(obj$sequence_reliability)[1]
     coln <- dim(obj$column_reliability)[1]/rown
   }
 
+  ## scales for PDF
   w <- coln/10
   h <- rown/4
 
@@ -33,10 +33,10 @@ heatmap.msa <- function(obj, file = NULL){
     scale_fill_gradient(low = "red", high = "yellow") +
     ylab("Sequences (input order)") +
     xlab("Sites") +
+    scale_y_reverse(breaks= pretty_breaks()) +
     theme(plot.title = element_text(size = 20, face = "bold"),
           legend.title = element_text(size = 18),
           legend.text = element_text(size = 14))+
-    scale_y_reverse()+
     ylab("Sequences (input order)")+
     xlab("Sites")+
     theme_bw()+

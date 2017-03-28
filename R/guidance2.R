@@ -1,4 +1,4 @@
-#' GUIDetree-based AligNment ConficencE
+#' GUIDetree-based AligNment ConficencE 2
 #'
 #' @param seq is the raw input sequences of class DNAbin (DNA) or SeqFastaAA (AA)
 #' @param cutoff specifies a cutoff to remove unreliable columns below the cutoff
@@ -51,9 +51,9 @@
 #' @author Christoph Heibl
 #' @export
 
-guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
-  bootstrap = 100, msa.program = "mafft", method = "auto", mask = FALSE,
-  mafft_exec){
+guidance2 <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
+  bootstrap = 400, HoT.samples = 4, msa.program = "mafft",
+  method = "auto", mask = FALSE, mafft_exec){
 
 
   if (missing(mafft_exec)) mafft_exec <- "/usr/local/bin/mafft"
@@ -61,7 +61,7 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ##############################################
   ## SOME CHECKS
   ##############################################
-  if (!inherits(seq, "DNAbin", "AAbin"))
+  if (!inherits(seq, "DNAbin") & !inherits(seq[[1]], "AAbin"))
     stop("sequences not of class DNAbin or AAbin (ape)")
 
 
@@ -73,14 +73,15 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
 
   ## Generate BASE alignment
   ###########################
-  cat("Generating the base alignment")
+  cat("Generating the base alignment \n")
   if (msa.program == "mafft"){
+    # base.msa <- mafft_AA(seq, method = method)
+    # C  On my MAC mafft is in /usr/local/bin/ but function is not working
     base.msa <- mafft(seq, method = method, exec = mafft_exec)
   }
   if (msa.program == "prank"){
     base.msa <- prank(seqs)
   }
-  cat("... done \n")
   ## form into matrix for perturbation
   base.msa <- as.character(base.msa)
 
@@ -103,6 +104,8 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
       return(pertubatedMSA)
     }
   }
+
+
 
   ## Generating alternative (pertubated) MSAs
   ###########################################
@@ -159,33 +162,39 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ## Alignment of MSA BP times with new NJ guide trees
   ## -------------------------------------------------
   cat("  Alignment of pertubated MSAs using NJ guide trees \n")
+  # names(seq) <- seq_nam
 
+  # if (parallel == TRUE){
+  #
+  #   if(msa.program == "mafft"){
+  #       guide.msa <- pbmclapply(nj.guide.trees,
+  #         FUN = function(x) mafft_AA(x = seq, gt = x, method = method),
   if (parallel){
     if (msa.program == "mafft"){
       guide.msa <- pbmclapply(nj.guide.trees,
         function(x, seq, method) mafft(seq, gt = x,
-          method = method, exec = mafft_exec),
+          method = method, exec = mafft_exec, op = runif(1, 0, 5)),
         seq = seq, method = method,
         mc.cores = ncore, ignore.interactive = TRUE)
     }
-    if (msa.program == "prank"){
-      guide.msa <- pbmclapply(nj.guide.trees,
-        FUN = function(x, seq, method) prank(x = seq, guidetree = x,
-          path = prank_exec), seq = seq, mc.cores = ncore, ignore.interactive = TRUE)
-    }
+    # if (msa.program == "prank"){
+    #   guide.msa <- pbmclapply(nj.guide.trees,
+    #     FUN = function(x, seq, method) prank(x = seq, guidetree = x,
+    #       path = prank_exec), seq = seq, mc.cores = ncore, ignore.interactive = TRUE)
+    # }
   }
   if (!parallel){
     if (msa.program == "mafft"){
       guide.msa <- lapply(nj.guide.trees,
         function(x, seq, method) mafft(seq, gt = x,
-          method = method, exec = mafft_exec),
+          method = method, exec = mafft_exec, op = runif(1, 0,5)),
         seq = seq, method = method)
     }
-    if (msa.program == "prank"){
-      guide.msa <- lapply(nj.guide.trees,
-        FUN = function(x, seq, method) prank(x = seq, guidetree = x,
-          path = prank_exec), seq = seq)
-    }
+    # if (msa.program == "prank"){
+    #   guide.msa <- lapply(nj.guide.trees,
+    #     FUN = function(x, seq, method) prank(x = seq, guidetree = x,
+    #       path = prank_exec), seq = seq)
+    # }
   }
 
   mafft_created <- list.files(getwd(),
