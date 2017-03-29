@@ -4,27 +4,30 @@
 \alias{HoT_dev}
 \title{Heads or Tails alignment reliability}
 \usage{
-HoT_dev(sequences, cutoff = 0.93, parallel = FALSE, ncore,
-  msa.program = "mafft", method = "auto", mask = FALSE, mafft_exec,
-  plot_guide = TRUE, n.part)
+HoT_dev(sequences, msa.program = "mafft", exec, n.part = "auto",
+  col.cutoff = "auto", seq.cutoff = "auto", mask.cutoff = "auto",
+  parallel = FALSE, ncore, method = "auto", plot_guide = TRUE)
 }
 \arguments{
 \item{sequences}{An object of class \code{\link{DNAbin}} or \code{\link{AAbin}}
 containing unaligned sequencesuences of DNA or amino acids.#' @param cutoff specifies a cutoff to remove unreliable columns below the cutoff}
 
-\item{cutoff}{specifies a cutoff to remove unreliable columns below the
-cutoff}
+\item{msa.program}{A charcter string giving the name of the MSA program,
+one of c("mafft", "muscle", "clustalo", "clustalw2"); MAFFT is default}
+
+\item{n.part}{number of co-optimal alignments should be used (must be integer < Ntip - 3)}
+
+\item{col.cutoff}{numberic between 0 and 1; specifies a cutoff to remove unreliable columns below the cutoff; either user supplied or "auto" (0.73)}
+
+\item{seq.cutoff}{numberic between 0 and 1; specifies a cutoff to remove unreliable sequences below the cutoff; either user supplied of "auto" (0.5)}
+
+\item{mask.cutoff}{specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA); either user supplied of "auto" (0.5)}
 
 \item{parallel}{logical, if TRUE, specify the number of cores}
 
 \item{ncore}{number of cores}
 
-\item{msa.program}{A charcter string giving the name of the MSA program,
-currelty either \code{"mafft"} (default) or\code{"prank"}.}
-
 \item{method}{further arguments passed to MAFFT, default is "auto"}
-
-\item{mask}{specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA)}
 
 \item{mafft_exec}{A character string giving the path to the executable of MAFFT
 (usually: '/usr/local/bin/mafft')}
@@ -38,8 +41,7 @@ sequencesuence_reliability
 
 column_reliability
 
-HoT_MSA: is the base MSA removed from unreliable columns below
-  \code{cutoff}
+HoT_MSA: is the base MSA removed from unreliable sites and/or sequences and/or masked residues below the cutoffs
 
 base_msa
 }

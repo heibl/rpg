@@ -53,15 +53,15 @@
 
 guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   bootstrap = 100, msa.program = "mafft", method = "auto", mask = FALSE,
-  mafft_exec){
+  exec){
 
 
-  if (missing(mafft_exec)) mafft_exec <- "/usr/local/bin/mafft"
+  # if (missing(exec)) exec <- "/usr/local/bin/mafft"
 
   ##############################################
   ## SOME CHECKS
   ##############################################
-  if (!inherits(seq, "DNAbin", "AAbin"))
+  if (!inherits(seq, c("DNAbin", "AAbin")))
     stop("sequences not of class DNAbin or AAbin (ape)")
 
 
@@ -75,7 +75,7 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
   ###########################
   cat("Generating the base alignment")
   if (msa.program == "mafft"){
-    base.msa <- mafft(seq, method = method, exec = mafft_exec)
+    base.msa <- mafft(seq, method = method, exec = exec)
   }
   if (msa.program == "prank"){
     base.msa <- prank(seqs)
@@ -164,7 +164,7 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
     if (msa.program == "mafft"){
       guide.msa <- pbmclapply(nj.guide.trees,
         function(x, seq, method) mafft(seq, gt = x,
-          method = method, exec = mafft_exec),
+          method = method, exec = exec),
         seq = seq, method = method,
         mc.cores = ncore, ignore.interactive = TRUE)
     }
@@ -178,7 +178,7 @@ guidance <- function(seq, cutoff = 0.93, parallel = FALSE, ncore,
     if (msa.program == "mafft"){
       guide.msa <- lapply(nj.guide.trees,
         function(x, seq, method) mafft(seq, gt = x,
-          method = method, exec = mafft_exec),
+          method = method, exec = exec),
         seq = seq, method = method)
     }
     if (msa.program == "prank"){

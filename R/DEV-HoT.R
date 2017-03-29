@@ -3,23 +3,23 @@
 #'   HoT algorithm
 #' @param sequences An object of class \code{\link{DNAbin}} or \code{\link{AAbin}}
 #'   containing unaligned sequencesuences of DNA or amino acids.#' @param cutoff specifies a cutoff to remove unreliable columns below the cutoff
-#' @param cutoff specifies a cutoff to remove unreliable columns below the
-#'   cutoff
+#' @param col.cutoff numberic between 0 and 1; specifies a cutoff to remove unreliable columns below the cutoff; either user supplied or "auto" (0.73)
+#' @param seq.cutoff numberic between 0 and 1; specifies a cutoff to remove unreliable sequences below the cutoff; either user supplied of "auto" (0.5)
+#'@param mask.cutoff specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA); either user supplied of "auto" (0.5)
 #' @param parallel logical, if TRUE, specify the number of cores
 #' @param ncore number of cores
 #' @param msa.program A charcter string giving the name of the MSA program,
-#'   currelty either \code{"mafft"} (default) or\code{"prank"}.
+#'   one of c("mafft", "muscle", "clustalo", "clustalw2"); MAFFT is default
 #' @param mafft_exec A character string giving the path to the executable of MAFFT
 #'   (usually: '/usr/local/bin/mafft')
 #' @param method further arguments passed to MAFFT, default is "auto"
-#' @param mask specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA)
+#' @param n.part number of co-optimal alignments should be used (must be integer < Ntip - 3)
 #'
 #' @return alignment_reliability
 #' @return residue_reliability
 #' @return sequencesuence_reliability
 #' @return column_reliability
-#' @return HoT_MSA: is the base MSA removed from unreliable columns below
-#'   \code{cutoff}
+#' @return HoT_MSA: is the base MSA removed from unreliable sites and/or sequences and/or masked residues below the cutoffs
 #' @return base_msa
 #'
 #' @details Calculates column reliability by comparing alternative
@@ -27,7 +27,7 @@
 #' @author Franz-Sebastian Krah
 #' @references G. Landan and D. Graur (2008). Local reliability measures from sets of co-optimal multiple sequencesuence alignments. 13:15--24
 #'
-#' @importFrom ips mafft
+#' @import ips
 #' @import doSNOW
 #' @import foreach
 #' @import parallel
@@ -42,15 +42,15 @@
 #' @export
 
 
-HoT_dev <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
-  msa.program = "mafft", method = "auto", mask = FALSE,
-  mafft_exec, prank_exec, plot_guide = TRUE, n.part = "auto"){
-
-
-
-  if (missing(mafft_exec)) mafft_exec <- "/usr/local/bin/mafft"
-  if (missing(prank_exec)) prank_exec <- "/usr/local/bin/prank"
-
+HoT_dev <- function(sequences,
+  msa.program = "mafft", exec,
+  n.part = "auto",
+  col.cutoff = "auto",
+  seq.cutoff = "auto",
+  mask.cutoff = "auto",
+  parallel = FALSE, ncore,
+  method = "auto",
+  plot_guide = TRUE){
 
   ##############################################
   ## SOME CHECKS
@@ -58,7 +58,37 @@ HoT_dev <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
   if (!inherits(sequences, c("DNAbin","AAbin")))
     stop("sequencesuences not of class DNAbin or AAbin (ape)")
 
+  if(length(sequences)>200)
+    message("N seq > 200: consider using 'pasta' with desired MSA confidence program")
 
+  ## Check for MSA program
+  if(missing(exec)){
+    os <- Sys.info()[1]
+    if (msa.program =="mafft") {
+      exec <- switch(os, Linux = "mafft", Darwin = "mafft",
+        Windows = "mafft.bat")
+    }
+    if (msa.program =="muscle") {
+      exec <- switch(os, Linux = "muscle", Darwin = "muscle",
+        Windows = "muscle3.8.31_i86win32.exe")
+    }
+    if (msa.program =="clustalo") {
+      exec <- switch(os, Linux = "clustalo", Darwin = "clustalo",
+        Windows = "clustalo.exe")
+    }
+    if (msa.program =="clustalw2") {
+      exec <- switch(os, Linux = "clustalw", Darwin = "clustalw2",
+      Windows = "clustalw2.exe")
+    }
+  }
+  out <- system(paste(exec, "--v", sep=" "), ignore.stdout = TRUE, ignore.stderr = TRUE)
+  if (out == 127)
+    stop("please provide exec path or install MSA program in root \n
+        i.e. in Unix: '/usr/local/bin/mafft'")
+
+  ## Sequence type, needed for ips::read.fas
+  type <- class(sequences)
+  type <- gsub("bin", "", type)
   ##############################################
   ## PART I
   ##############################################
@@ -67,8 +97,18 @@ HoT_dev <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
   cat("Generating the base alignment")
   ## MAFFT
   if (msa.program == "mafft"){
-    base.msa <- mafft(sequences, method = method, exec = mafft_exec)
+    base.msa <- mafft(sequences, method = method, exec = exec)
   }
+  if (msa.program == "muscle"){
+    base.msa <- muscle2(sequences, exec = exec, type = type)
+  }
+  if (msa.program == "clustalo"){
+    base.msa <- clustalo(x = sequences, exec = exec, type = type)
+  }
+  if (msa.program == "clustalw2"){
+    base.msa <- clustalw2(x = sequences, exec = exec, type =type)
+  }
+
   cat("... done \n")
 
   cat("Calculate start tree")
@@ -117,17 +157,15 @@ HoT_dev <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
 
   if (parallel){
     pb <- txtProgressBar(max = ncol(align_parts), style = 3)
-    # progress <- function(n) setTxtProgressBar(pb, n)
-    # opts <- list(progress = progress)
-
     cl <- makeCluster(ncore)
     registerDoSNOW(cl)
     alt_msas <- list()
+
     for(i in 1:ncol(align_parts)){ ## foreach does not work
       setTxtProgressBar(pb, i)
       alt_msas[[i]] <- align_part_set(x = sequences,
         partition_set = align_parts[,i],
-        method = method, mafft_exec = mafft_exec)
+        method = method, exec = exec, msa.program = msa.program, type = type)
     }
     stopCluster(cl)
   }
@@ -136,15 +174,13 @@ HoT_dev <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
     alt_msas <- foreach(i = 1:ncol(align_parts)) %do% {
       setTxtProgressBar(pb, i)
       align_part_set(x = sequences, partition_set = align_parts[,i],
-        method = method, mafft_exec = mafft_exec)
-      if(plot_guide){
-        # phytools::plotTree(start_tree)
-        nodelabels(pch = 16, cex = 1.5, col = "red",
-          node = as.numeric(gsub("X", "", names(align_parts)[i])))
-      }
+        method = method, exec = exec, msa.program = msa.program, type = type)
     }
   }
   close(pb)
+
+
+
   ## unlist
   alt_msas <- foreach(i = 1:length(alt_msas), .combine = c) %do% {
     alt_msas[[i]]
@@ -214,14 +250,44 @@ HoT_dev <- function(sequences, cutoff = 0.93, parallel = FALSE, ncore,
   srb <- srb[,-del[2:length(del)]]
   srb <- data.frame(row = srb[,1], sequencesuence_score = rowMeans(srb[,2:ncol(srb)]))
 
-  ## remove unreliable columns
-  remove_cols <- crb[,2] < cutoff
-  HoT.msa <- base.msa[,!remove_cols]
 
-  # if(mask == TRUE){
-  #   if(inherits(sequences, "DNAbin")){     base.msa[###<0.5 & base.msa!="-"] <- "N" }
-  #   if(inherits(sequences, "AAbin")) {     base.msa[###<0.5 & base.msa!="-"] <- "X"  }
-  # }
+
+  ## masking residues below cutoff
+  if (mask.cutoff>0 ){
+    txt <- as.vector(as.character(base.msa))
+    mat <- data.frame(rrb, txt)
+    rown <- max(mat$row)
+    coln <- max(mat$col)
+    msa <- matrix(mat$residue_score, nrow = rown, ncol = coln)
+
+    if (mask.cutoff=="auto"){ mask.cutoff <- 0.50 }
+
+    if (inherits(sequences, "DNAbin")){
+      msa[msa<mask.cutoff & !is.na(msa)] <- "N"
+      mask.msa <- as.DNAbin(msa)
+      rownames(mask.msa) <- labels(sequences)
+    }
+    if (inherits(sequences, "AAbin")) {
+      msa[msa<mask.cutoff & !is.na(msa)] <- "X"
+      rownames(msa) <- labels(sequences)
+      class(msa) <- "AAbin"
+    }
+    HoT.msa <- msa
+  }
+  ## remove unreliable columns
+  if (col.cutoff>0){
+    ifelse(mask.cutoff>0, msa <- HoT.msa, msa <- base.msa)
+    if(col.cutoff =="auto"){col.cutoff <- 0.97}
+    remove_cols <- crb[,2] < col.cutoff
+    HoT.msa <- msa[,!remove_cols]
+  }
+  ## remove unreliable sequences
+  if (seq.cutoff>0){
+    ifelse(mask.cutoff>0, msa <- HoT.msa, msa <- base.msa)
+    if (seq.cutoff =="auto"){seq.cutoff <- 0.5}
+    remove_seq <- srb$sequencesuence_score < seq.cutoff
+    HoT.msa <- HoT.msa[!remove_seq,]
+  }
 
 
   res <-  list(alignment_reliability = alignment_reliability,
