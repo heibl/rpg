@@ -7,11 +7,11 @@
 #' @param seq.cutoff numberic between 0 and 1; specifies a cutoff to remove unreliable sequences below the cutoff; either user supplied of "auto" (0.5)
 #'@param mask.cutoff specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA); either user supplied of "auto" (0.5)
 #' @param parallel logical, if TRUE, specify the number of cores
-#' @param ncore number of cores
+#' @param ncore number of cores (default is 'auto')
 #' @param msa.program A charcter string giving the name of the MSA program,
 #'   one of c("mafft", "muscle", "clustalo", "clustalw2"); MAFFT is default
-#' @param mafft_exec A character string giving the path to the executable of MAFFT
-#'   (usually: '/usr/local/bin/mafft')
+#' @param exec A character string giving the path to the executable of the
+#'   alignment program.
 #' @param method further arguments passed to MAFFT, default is "auto"
 #' @param n.part number of co-optimal alignments should be used (must be integer < Ntip - 3)
 #'
@@ -50,7 +50,7 @@ HoT_dev <- function(sequences,
   mask.cutoff = "auto",
   parallel = FALSE, ncore,
   method = "auto",
-  plot_guide = TRUE){
+  plot_guide = TRUE) {
 
   ##############################################
   ## SOME CHECKS
@@ -80,11 +80,12 @@ HoT_dev <- function(sequences,
       exec <- switch(os, Linux = "clustalw", Darwin = "clustalw2",
       Windows = "clustalw2.exe")
     }
-  }
-  out <- system(paste(exec, "--v", sep=" "), ignore.stdout = TRUE, ignore.stderr = TRUE)
-  if (out == 127)
-    stop("please provide exec path or install MSA program in root \n
+    out <- system(paste(exec, "--v", sep=" "), ignore.stdout = TRUE, ignore.stderr = TRUE)
+    if (out == 127)
+      stop("please provide exec path or install MSA program in root \n
         i.e. in Unix: '/usr/local/bin/mafft'")
+  }
+
 
   ## Sequence type, needed for ips::read.fas
   type <- class(sequences)
@@ -95,7 +96,6 @@ HoT_dev <- function(sequences,
   ## BASE and alternative MSAs
   ##############################################
   cat("Generating the base alignment")
-  ## MAFFT
   if (msa.program == "mafft"){
     base.msa <- mafft(sequences, method = method, exec = exec)
   }
@@ -108,11 +108,11 @@ HoT_dev <- function(sequences,
   if (msa.program == "clustalw2"){
     base.msa <- clustalw2(x = sequences, exec = exec, type =type)
   }
-
   cat("... done \n")
 
-  cat("Calculate start tree")
   ## calculate start guide tree
+  #####################################
+  cat("Calculate start tree")
   base.msa.ml <- as.phyDat(base.msa)
   # find ML distance as input to nj tree search
   ml.dist.msa <- dist.ml(base.msa.ml)

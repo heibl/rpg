@@ -1,10 +1,11 @@
-#' @title Plot GUIDANCE Residue Scores
+#' Plot GUIDANCE Residue Scores
 #' @description Plots a heatmap of GUIDANCE residue scores
 #' @param obj is the output object of guidance
 #' @param file if a path is supplied, the alignment is stored in a pdf, if file=NULL (default) alignment is promted in R
 #'
 #' @author Franz-Sebastian Krah
-#' @importFrom ggplot2 ggplot
+#' @import ggplot2
+#' @import scales
 #' @export
 
 heatmap.msa <- function(obj, file = NULL){
@@ -56,36 +57,3 @@ heatmap.msa <- function(obj, file = NULL){
     return(p)
   }
 }
-
-
-
-# guidance_score_heatmap <- function(guidance_obj, gap.col ="white"){
-#   rown <- dim(guidance_obj$GUIDANCE_sequence_score)[1]
-#   coln <- dim(guidance_obj$GUIDANCE_residue_score)[1]/rown
-#   msa <- matrix(guidance_obj$GUIDANCE_residue_score, nrow = rown, ncol = coln)
-#   hmcol<-brewer.pal(11,"RdYlBu")
-#   require("gplots")
-#   heatmap.2(msa,
-#     # if(print.base)
-#     # cellnote=mat2,
-#     dendrogram = "none",
-#     labRow = labels(guidance_obj$base_msa),
-#     labCol = "",
-#     Rowv = FALSE,
-#     Colv = FALSE,
-#     notecex=1.0,
-#     notecol="black",
-#     na.color=gap.col,
-#     trace = "none",
-#     key = T,
-#     key.title = "MSA confidence\nscale",
-#     key.ylab = "",
-#     key.xlab = "Uncertain <---> Conficent",
-#     density.info = "density",
-#     keysize = 1.7,
-#     col  = hmcol)
-# }
-#   if(is.null(file)){
-#     print(p)
-#   }
-# }

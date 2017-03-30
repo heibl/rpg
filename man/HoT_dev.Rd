@@ -15,6 +15,9 @@ containing unaligned sequencesuences of DNA or amino acids.#' @param cutoff spec
 \item{msa.program}{A charcter string giving the name of the MSA program,
 one of c("mafft", "muscle", "clustalo", "clustalw2"); MAFFT is default}
 
+\item{exec}{A character string giving the path to the executable of the
+alignment program.}
+
 \item{n.part}{number of co-optimal alignments should be used (must be integer < Ntip - 3)}
 
 \item{col.cutoff}{numberic between 0 and 1; specifies a cutoff to remove unreliable columns below the cutoff; either user supplied or "auto" (0.73)}
@@ -25,12 +28,9 @@ one of c("mafft", "muscle", "clustalo", "clustalw2"); MAFFT is default}
 
 \item{parallel}{logical, if TRUE, specify the number of cores}
 
-\item{ncore}{number of cores}
+\item{ncore}{number of cores (default is 'auto')}
 
 \item{method}{further arguments passed to MAFFT, default is "auto"}
-
-\item{mafft_exec}{A character string giving the path to the executable of MAFFT
-(usually: '/usr/local/bin/mafft')}
 }
 \value{
 alignment_reliability

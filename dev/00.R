@@ -1,13 +1,3 @@
-library("ips")
-library("foreach")
-library("parallel")
-library("doSNOW")
-library("pbmcapply")
-library("phangorn")
-library("plyr")
-library("ggplot2")
-library("scales")
-library("adephylo")
 library("rpg")
 
 # 1.	Read example sequences
@@ -19,37 +9,38 @@ seq_dna <- sample(ms, 10)
 seq_aa <- read.fas("dev/data/AATF.fas", type ="AA")
 
 
-# seq = seq_dna
 sequences = seq_aa
+parallel = TRUE
 ncore = 4
-bootstrap = 2
-msa.program = "mafft"
-method = "auto"
-parallel  = TRUE
-cutoff = 0.93
-mask = FALSE
-plot_guide = TRUE
-n.part = "auto"
-exec <- "/usr/local/bin/mafft"
+bootstrap = 10
+col.cutoff = "auto"
+seq.cutoff = "auto"
+mask.cutoff = "auto"
+msa.program <- "clustalo"
 exec <- "/Applications/clustalo"
+msa.program <- "mafft"
+exec <- "/usr/local/bin/mafft"
+msa.program <- "clustalw2"
 exec <- "/Applications/clustalw2"
+msa.program <- "muscle"
 exec <- "/Applications/muscle"
 
-seq_dna <- read.fas("/Users/krah/Dropbox/color_gradient/data/new_phylo_march17/selected_msa/rpb1.fas", type ="DNA")
-system.time(g_msa <- guidance(seq = seq_dna,
-                                bootstrap = 100,
-                                msa.program = "mafft",
-                                exec = "/usr/local/bin/mafft",
-                                method = "auto",
-                                parallel  = TRUE,
-                                ncore = 4,
-                                cutoff = 0.93,
-                                mask = FALSE))
+system.time(g_msa <- guidance(sequences = seq_aa,
+  msa.program = "muscle",
+  exec = "/Applications/muscle",
+  bootstrap = 10,
+  col.cutoff = "auto",
+  seq.cutoff = "auto",
+  mask.cutoff = "auto",
+  parallel = TRUE, ncore = "auto",
+  method = "auto"))
 
-# heatmap.msa(g_msa, file ="dev/data/test_msa_plot.pdf")
-# system("open dev/data/test_msa_plot.pdf")
 heatmap.msa(g_msa)
 
+
+
+
+##
 msa.program = "mafft"
 exec <- "/usr/local/bin/mafft"
 n.part = "auto"

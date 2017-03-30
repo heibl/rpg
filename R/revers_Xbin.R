@@ -3,8 +3,8 @@
 #'
 rev_DNA <- function(x){
 
-  if (!inherits(sequences, c("DNAbin","AAbin")))
-    stop("sequencesuences not of class DNAbin or AAbin (ape)")
+  if (!inherits(x, c("DNAbin","AAbin")))
+    stop("sequences not of class DNAbin or AAbin (ape)")
 
   if(is.matrix(x)){
     x_mat <- as.character(x)
