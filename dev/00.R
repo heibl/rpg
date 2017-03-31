@@ -1,4 +1,10 @@
 library("rpg")
+library("ips")
+library("parallel")
+library("foreach")
+library("phangorn")
+library("doSNOW")
+library("adephylo")
 
 # 1.	Read example sequences
 ## DNA
@@ -25,7 +31,7 @@ exec <- "/Applications/clustalw2"
 msa.program <- "muscle"
 exec <- "/Applications/muscle"
 
-system.time(g_msa <- guidance(sequences = seq_aa,
+system.time(g_msa <- guidance(sequences = seq_dna,
   msa.program = "muscle",
   exec = "/Applications/muscle",
   bootstrap = 10,
@@ -38,9 +44,8 @@ system.time(g_msa <- guidance(sequences = seq_aa,
 heatmap.msa(g_msa)
 
 
-
-
 ##
+sequences <- seq_dna
 msa.program = "mafft"
 exec <- "/usr/local/bin/mafft"
 n.part = "auto"
@@ -51,17 +56,19 @@ parallel = FALSE
 ncore = 4
 method = "auto"
 plot_guide = TRUE
+n.coopt = "auto"
 
-system.time(hot_msa <- HoT_dev(sequences = seq_aa, # MUSCLE stops after Scores
+system.time(hot_msa <- HoT_dev(sequences = seq_dna, # MUSCLE stops after Scores
   msa.program = "muscle",
   exec = "/Applications/muscle",
-  n.part = "auto",
+  n.coopt = "auto",
   col.cutoff = "auto",
   seq.cutoff = "auto",
   mask.cutoff = "auto",
   parallel = TRUE, ncore = 4,
   method = "auto",
-  plot_guide = TRUE))
+  plot_guide = TRUE,
+  alt.msas.file))
 
 system.time(hot_msa <- HoT_dev(sequences = seq_dna,
   ncore = 4,
@@ -69,3 +76,39 @@ system.time(hot_msa <- HoT_dev(sequences = seq_dna,
   parallel  = TRUE))
 
 heatmap.msa(obj = hot_msa)
+
+
+
+
+
+
+##
+sequences = seq_dna
+msa.program = "muscle"
+# exec <- "/usr/local/bin/mafft"
+exec <- "/Applications/muscle"
+bootstrap = 10
+n.part="auto"
+col.cutoff = "auto"
+seq.cutoff = "auto"
+mask.cutoff = "auto"
+parallel = TRUE
+ncore =4
+method = "auto"
+# alt.msas.file
+n.coopt = "auto"
+
+g2 <- guidance2(sequences = seq_dna,
+  msa.program = "clustalw2",
+  exec <- "/Applications/clustalw2",
+  bootstrap = 10,
+  n.part="auto",
+  col.cutoff = "auto",
+  seq.cutoff = "auto",
+  mask.cutoff = "auto",
+  parallel = TRUE, ncore ="auto",
+  method = "auto",
+  n.coopt = "auto",
+  alt.msas.file = paste(getwd(), "R", "test", sep="/"))
+
+heatmap.msa(obj = g2)

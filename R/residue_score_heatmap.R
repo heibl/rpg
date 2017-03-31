@@ -10,27 +10,18 @@
 
 heatmap.msa <- function(obj, file = NULL){
 
-  hot <- grep("reliability", names(obj))
-  guid <- grep("GUIDANCE", names(obj))
-
   txt <- as.vector(as.character(obj$base_msa))
-
-  if(length(guid) > 0){
-    mat <- data.frame(obj$GUIDANCE_residue_score, txt)
-    rown <- dim(obj$GUIDANCE_sequence_score)[1]
-    coln <- dim(obj$GUIDANCE_residue_score)[1]/rown
-  }else{
-    mat <- data.frame(obj$residue_reliability, txt)
-    rown <- dim(obj$sequence_reliability)[1]
-    coln <- dim(obj$column_reliability)[1]/rown
-  }
+  mat <- data.frame(obj$residue_pair_residue_score, txt)
+  rown <- max(mat$residue)
+  coln <- max(mat$col)
+  res_mat <- matrix(mat$res_pair_res_score, nrow = rown, ncol = coln)
 
   ## scales for PDF
   w <- coln/10
   h <- rown/4
 
-  p <- ggplot(mat,aes(col, row)) +
-    geom_tile(aes(fill = residue_score), colour = "white") +
+  p <- ggplot(mat,aes(col, residue)) +
+    geom_tile(aes(fill = res_pair_res_score), colour = "white") +
     scale_fill_gradient(low = "red", high = "yellow") +
     ylab("Sequences (input order)") +
     xlab("Sites") +

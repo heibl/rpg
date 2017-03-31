@@ -33,7 +33,7 @@ alignment program.}
 containing unaligned sequences of DNA or amino acids.}
 }
 \value{
-alignment_score: is the GUIDANCE alignment score
+alignment_score
 
 GUIDANCE_residue_score
 
@@ -41,8 +41,7 @@ GUIDANCE_score: is the GUIDANCE column score
 
 GUIDANCE_sequence_score
 
-guidance_msa: is the base MSA removed from unreliable columns below
-  cutoff
+guidance_msa: is the base MSA removed from unreliable residues/columns/sequences below \code{cutoffs}
 
 base_msa
 }

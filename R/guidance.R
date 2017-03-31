@@ -329,49 +329,87 @@ guidance <- function(sequences,
   ##  if wanted, store alternative MSAs into a zip file
   if(!missing(alt.msas.file)){
     files <- list.files(tempdir())
-    files <- files[grep("\\.fas", files)]
-    for(i in 1:bootstrap){
+    files <- files[grep("HoT", files)]
+    for(i in 1:(n.coopt*bootstrap)){
       file.rename(paste(tempdir(), files[i], sep="/"),
         paste(tempdir(), paste("altMSA", i, ".fas",sep=""), sep="/"))}
     files <- list.files(tempdir(), full.names = TRUE)
     files <- files[grep("altMSA*", files)]
-    zip(alt.msas.file, files)
+    zip(zipfile = alt.msas.file, files = files)
+
+    # maybe better to use gzfile
+    ## currently zip creates many wired subfolders
   }
+
   ## delete temporary files in temporary directory
   unlink(msa_out[file.exists(msa_out)], force = TRUE)
   # unlink(tempdir(), force = TRUE) # do not use this, it causes problems
 
-  ## GUIDANCE column score
-  gsc <- do.call(cbind, lapply(bpres, function(x) x[[1]]))
-  del <- grep("V1", names(gsc))
-  gsc <- gsc[, -del[2:length(del)]]
-  gsc <- data.frame(col = gsc[, 1], guidance_score = rowMeans(gsc[,2:ncol(gsc)]))
+
+  ### Calculate mean scores
+  #------------------------------
+  # Mean score
+  msc <- do.call(rbind, lapply(bpres, function(x) x[[1]]))
+  msc[] <- lapply(msc, as.numeric)
+  msc <- colMeans(msc)
+  msc <- data.frame(msc)
+
+  ## Column score
+  CS <- do.call(cbind, lapply(bpres, function(x) x[[2]]))
+  del <- grep("col", names(CS))
+  CS <- CS[, -del[2:length(del)]]
+  CS <- data.frame(col = CS[, 1],
+    column_score = rowMeans(CS[,2:ncol(CS)], na.rm = TRUE))
+
+  ## Residue pair column score (GUIDANCE Score)
+  g.cs <- do.call(cbind, lapply(bpres, function(x) x[[3]]))
+  del <- grep("col\\b", names(g.cs))
+  g.cs <- g.cs[, -del[2:length(del)]]
+  g.cs <- data.frame(col = g.cs[, 1],
+    res_pair_col_score = rowMeans(g.cs[,2:ncol(g.cs)], na.rm = TRUE))
 
   ## GUIDANCE Alignment score
-  alignment_score <- mean(gsc[, 2])
+  alignment_score <- mean(g.cs[, 2])
+  msc <- rbind(msc, MEAN_GUIDANCE_SCORE = alignment_score)
 
-  ## GUIDANCE residue score
-  grsc <- do.call(cbind, lapply(bpres, function(x) x[[2]]))
-  del <- grep("V1|V2", names(grsc))
-  grsc <- grsc[,-del[3:length(del)]]
-  grsc <- data.frame(grsc[,1:2], rowMeans(grsc[,3:ncol(grsc)]))
-  colnames(grsc) <- c("col", "row", "residue_score")
+  # Residue pair residue score
+  rpr.sc <- do.call(cbind, lapply(bpres, function(x) x[[4]]))
+  del <- grep("col\\b|residue", names(rpr.sc))
+  rpr.sc <- rpr.sc[, -del[3:length(del)]]
+  rpr.sc <- data.frame(col = rpr.sc[, 1], residue = rpr.sc[, 2],
+    res_pair_res_score = rowMeans(rpr.sc[,3:ncol(rpr.sc)], na.rm = TRUE))
 
-  ## GUIDANCE sequence score
-  gssc <- do.call(cbind, lapply(bpres, function(x) x[[3]]))
-  del <- grep("V1", names(gssc))
-  gssc <- gssc[,-del[2:length(del)]]
-  gssc <- data.frame(row = gssc[,1], sequence_score = rowMeans(gssc[,2:ncol(gssc)]))
+  # Residual pair sequence pair score
+  rpsp.sc <- do.call(cbind, lapply(bpres, function(x) x[[5]]))
+  del <- grep("seq_row1|seq_row2", names(rpsp.sc))
+  rpsp.sc <- rpsp.sc[, -del[3:length(del)]]
+  rpsp.sc <- data.frame(seq1 = rpsp.sc[, 1], seq2 = rpsp.sc[, 2],
+    res_pair_seq_pair_score = rowMeans(rpsp.sc[,3:ncol(rpsp.sc)], na.rm = TRUE))
 
+  # Residual pair sequence score
+  rps.sc <- do.call(cbind, lapply(bpres, function(x) x[[6]]))
+  del <- grep("seq", names(rps.sc))
+  rps.sc <- rps.sc[, -del[2:length(del)]]
+  rps.sc <- data.frame(seq = rps.sc[, 1],
+    res_pair_seq_score = rowMeans(rps.sc[,2:ncol(rps.sc)], na.rm = TRUE))
+
+  # Residue pair score
+  rp.sc <- do.call(cbind, lapply(bpres, function(x) x[[7]]))
+  del <- grep("col|row1|row2", names(rp.sc))
+  rp.sc <- rp.sc[, -del[4:length(del)]]
+  rp.sc <- data.frame(col = rp.sc[, 1], row1 = rp.sc[,2], col2 = rp.sc[,3],
+    res_pair_score = rowMeans(rp.sc[,4:ncol(rp.sc)], na.rm = TRUE))
+  ### Calculate mean scores DONE
+  # maybe put this into a own function
 
   msa <- guidance.msa <- base.msa
   ## masking residues below cutoff
   if (mask.cutoff>0){
     txt <- as.vector(as.character(base.msa))
-    mat <- data.frame(grsc, txt)
-    rown <- max(mat$row)
+    mat <- data.frame(rpr.sc, txt)
+    rown <- max(mat$residue)
     coln <- max(mat$col)
-    res_mat <- matrix(mat$residue_score, nrow = rown, ncol = coln)
+    res_mat <- matrix(mat$res_pair_res_score, nrow = rown, ncol = coln)
 
     if (mask.cutoff=="auto"){ mask.cutoff <- 0.50 }
 
@@ -389,16 +427,18 @@ guidance <- function(sequences,
   }
   ## remove unreliable columns
   if (col.cutoff>0){
-    ifelse(mask.cutoff>0, msa <- guidance.msa, msa <- base.msa)
+    if (mask.cutoff>0) { msa <- guidance.msa
+    } else { msa <- base.msa }
     if(col.cutoff =="auto"){col.cutoff <- 0.97}
-    remove_cols <- gsc[,2] < col.cutoff
+    remove_cols <- g.cs[,2] < col.cutoff
     guidance.msa <- msa[,!remove_cols]
   }
   ## remove unreliable sequences
   if (seq.cutoff>0){
-    ifelse(mask.cutoff>0, msa <- guidance.msa, msa <- base.msa)
+    if (mask.cutoff>0) { msa <- guidance.msa
+    } else { msa <- base.msa }
     if (seq.cutoff =="auto"){seq.cutoff <- 0.5}
-    remove_sequences <- gssc$sequence_score < seq.cutoff
+    remove_sequences <- rps.sc$res_pair_seq_score < seq.cutoff
     guidance.msa <- msa[!remove_sequences,]
   }
 
@@ -407,11 +447,14 @@ guidance <- function(sequences,
   if(inherits(sequences, "AAbin")) {   base.msa <- as.AAbin(base.msa)  }
 
   ## Produce output
-  res <-  list(alignment_score = alignment_score,
-    GUIDANCE_residue_score = grsc,
-    GUIDANCE_score = gsc,
-    GUIDANCE_sequence_score = gssc,
-    guidance_msa =guidance.msa,
+  res <- list(mean_score = msc,
+    column_score = CS,
+    GUIDANCE_column_score = g.cs,
+    residue_pair_residue_score = rpr.sc,
+    residual_pair_sequence_pair_score  = rpsp.sc,
+    residual_pair_sequence_score = rps.sc,
+    residue_pair_score = rp.sc,
+    guidance_msa = guidance.msa,
     base_msa = base.msa)
 
   return(res)

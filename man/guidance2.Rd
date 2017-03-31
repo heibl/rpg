@@ -4,27 +4,29 @@
 \alias{guidance2}
 \title{Alignment Confidence Scores with GUIDANCE}
 \usage{
-guidance2(seq, cutoff = 0.93, parallel = FALSE, ncore, bootstrap = 400,
-  HoT.samples = 4, msa.program = "mafft", method = "auto", mask = FALSE,
-  mafft_exec)
+guidance2(sequences, msa.program = "mafft", exec, bootstrap = 100,
+  n.part = "auto", col.cutoff = "auto", seq.cutoff = "auto",
+  mask.cutoff = "auto", parallel = TRUE, ncore = "auto",
+  method = "auto", alt.msas.file, n.coopt = "auto")
 }
 \arguments{
-\item{seq}{is the raw input sequences of class DNAbin (DNA) or SeqFastaAA (AA)}
+\item{msa.program}{A charcter string giving the name of the MSA program,
+currelty one of c("mafft", "muscle", "clustalw2"); MAFFT is default}
 
-\item{cutoff}{specifies a cutoff to remove unreliable columns below the cutoff}
+\item{exec}{A character string giving the path to the executable of the
+alignment program.}
+
+\item{bootstrap}{An integer giving the number of perturbated MSAs.}
 
 \item{parallel}{logical, if TRUE, specify the number of cores}
 
 \item{ncore}{number of cores}
 
-\item{bootstrap}{An integer giving the number of perturbated MSAs.}
-
-\item{msa.program}{A charcter string giving the name of the MSA program,
-currelty either \code{"mafft"} (default) or\code{"prank"}.}
-
 \item{method}{further arguments passed to mafft, default is "auto"}
 
-\item{mask}{specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA)}
+\item{seq}{is the raw input sequences of class DNAbin (DNA) or SeqFastaAA (AA)}
+
+\item{cutoff}{specifies a cutoff to remove unreliable columns below the cutoff}
 
 \item{seqs}{An object of class \code{\link{DNAbin}} or \code{\link{AAbin}}
 containing unaligned sequences of DNA or amino acids.}
@@ -32,8 +34,7 @@ containing unaligned sequences of DNA or amino acids.}
 \item{cutoff}{specifies a cutoff to remove unreliable columns below the
 cutoff}
 
-\item{exec}{A character string giving the path to the executable of the
-alignment program.}
+\item{mask}{specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA)}
 }
 \value{
 alignment_score: is the GUIDANCE alignment score
@@ -51,7 +52,7 @@ base_msa
 }
 \description{
 Assess uncertainty in multiple sequence aligment (MSA) with the
-  GUIDANCE algorithm (Penn et al. 2010).
+  GUIDANCE2 algorithm based on GUIDANCE (Penn et al. 2010) and HoT (G. Landan and D. Graur 2008)
 }
 \details{
 GUIDetree-based AligNment ConficencE 2
@@ -69,6 +70,10 @@ Felsenstein J. 1985. Confidence limits on phylogenies: an
 Penn et al. (2010). An alignment confidence score capturing
   robustness to guide tree uncertainty. Molecular Biology and Evolution
   27:1759--1767
+
+Sela et al. (2015). GUIDANCE2: accurate detection of unreliable alignment regions accounting for the uncertainty of multiple parameters. Nucleic acids research 43:W7--W14
+
+G. Landan and D. Graur (2008). Local reliability measures from sets of co-optimal multiple sequencesuence alignments. Pacific Symposium on Biocomputin. 13:15--24
 }
 \author{
 Franz-Sebastian Krah

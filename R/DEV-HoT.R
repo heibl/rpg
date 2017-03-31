@@ -13,7 +13,7 @@
 #' @param exec A character string giving the path to the executable of the
 #'   alignment program.
 #' @param method further arguments passed to MAFFT, default is "auto"
-#' @param n.part number of co-optimal alignments should be used (must be integer < Ntip - 3)
+#' @param n.coopt number of co-optimal alignments should be used (must be integer < Ntip - 3)
 #'
 #' @return alignment_reliability
 #' @return residue_reliability
@@ -44,17 +44,23 @@
 
 HoT_dev <- function(sequences,
   msa.program = "mafft", exec,
-  n.part = "auto",
+  type,
+  n.coopt ="auto",
   col.cutoff = "auto",
   seq.cutoff = "auto",
   mask.cutoff = "auto",
-  parallel = FALSE, ncore,
+  parallel = FALSE, ncore = "auto",
   method = "auto",
-  plot_guide = TRUE) {
+  plot_guide = TRUE,
+  alt.msas.file) {
 
   ##############################################
   ## SOME CHECKS
   ##############################################
+  if(!is.object(sequences)){
+    read.fas(sequences, type = type)
+  }
+
   if (!inherits(sequences, c("DNAbin","AAbin")))
     stop("sequencesuences not of class DNAbin or AAbin (ape)")
 
@@ -86,10 +92,17 @@ HoT_dev <- function(sequences,
         i.e. in Unix: '/usr/local/bin/mafft'")
   }
 
+  ## generate some parameters if not specified
+  #---------------------------------------------
+  ## number of cores
+  if(ncore=="auto"){
+    ncore <- detectCores(all.tests = FALSE, logical = TRUE)
+  }
 
   ## Sequence type, needed for ips::read.fas
   type <- class(sequences)
   type <- gsub("bin", "", type)
+
   ##############################################
   ## PART I
   ##############################################
@@ -100,13 +113,13 @@ HoT_dev <- function(sequences,
     base.msa <- mafft(sequences, method = method, exec = exec)
   }
   if (msa.program == "muscle"){
-    base.msa <- muscle2(sequences, exec = exec, type = type)
+    base.msa <- muscle2(sequences, exec = exec)
   }
   if (msa.program == "clustalo"){
-    base.msa <- clustalo(x = sequences, exec = exec, type = type)
+    base.msa <- clustalo(x = sequences, exec = exec)
   }
   if (msa.program == "clustalw2"){
-    base.msa <- clustalw2(x = sequences, exec = exec, type =type)
+    base.msa <- clustalw2(x = sequences, exec = exec)
   }
   cat("... done \n")
 
@@ -134,18 +147,10 @@ HoT_dev <- function(sequences,
   ## produce MSA partitions
   align_parts <- partitions(start_tree)
 
-  ## subsample of partitions (co-optimal solutions)
-  if(n.part == "auto"){
-    nt <- Ntip(start_tree)
-    if(nt>40){
-      npart <- nt*0.1
-    }else{
-      npart <- ncol(align_parts)
-    }
-    align_parts <- sample(align_parts, npart)
-  }else{
-    align_parts <- sample(align_parts, n.part)
-  }
+  # here could be a sampling of co-opts like in
+  # guidance2. now we sample all
+  n.coopt.sub <- rep("all", ncol(align_parts))
+  n.coopt <- (Ntip(start_tree)-3)*8
 
 
   ##############################################
@@ -153,38 +158,59 @@ HoT_dev <- function(sequences,
   ##############################################
   ## Co-optimal MSAs
   ##############################################
-  cat("Generating co-optimal alignments \n")
+  cat(paste("Sampling", n.coopt, "co-optimal alignments \n", sep=" "))
+
+  msa_out <- vector(length = n.coopt)
+  for (i in seq_along(msa_out))
+    msa_out[i] <- tempfile(pattern = "HoT", tmpdir = tempdir(), fileext = ".fas")
+  unlink(msa_out[file.exists(msa_out)])
+
+
+  # predifined file allocation
+  start <- seq(1,n.coopt,8)
+  end <- seq(8,n.coopt,8)
+  stend <- data.frame(start, end)
+
+
+  align_part_set2 <- function(x, partition_set, method,
+    exec, msa.program, coopt.sub, files){
+    alt_msas <- align_part_set(x = x,
+      partition_set = partition_set,
+      method = method, exec = exec, msa.program = msa.program,
+      coopt.sub = coopt.sub)
+
+    for(j in 1:8)
+      write.fas(alt_msas[[j]], files[j])
+  }
+
+
+  pb <- txtProgressBar(max = ncol(align_parts), style = 3)
 
   if (parallel){
-    pb <- txtProgressBar(max = ncol(align_parts), style = 3)
+    progress <- function(n) setTxtProgressBar(pb, n)
+    opts <- list(progress = progress)
     cl <- makeCluster(ncore)
     registerDoSNOW(cl)
-    alt_msas <- list()
-
-    for(i in 1:ncol(align_parts)){ ## foreach does not work
-      setTxtProgressBar(pb, i)
-      alt_msas[[i]] <- align_part_set(x = sequences,
-        partition_set = align_parts[,i],
-        method = method, exec = exec, msa.program = msa.program, type = type)
-    }
+    foreach(i = 1:ncol(align_parts), .options.snow = opts,
+      .packages = c('rpg', 'ips', 'adephylo', 'foreach', 'phangorn')) %dopar% {
+        # setTxtProgressBar(pb, i)
+        align_part_set2(x = sequences, partition_set = align_parts[,i],
+          coopt.sub = n.coopt.sub,
+          method = method, exec = exec, msa.program = msa.program,
+          files = msa_out[stend[i,1]:stend[i,2]])
+      }
     stopCluster(cl)
   }
   if (!parallel){
-    pb <- txtProgressBar(min = 0, max = ncol(align_parts), style = 3)
     alt_msas <- foreach(i = 1:ncol(align_parts)) %do% {
       setTxtProgressBar(pb, i)
-      align_part_set(x = sequences, partition_set = align_parts[,i],
-        method = method, exec = exec, msa.program = msa.program, type = type)
+      align_part_set2(x = sequences, partition_set = align_parts[,i],
+        coopt.sub = n.coopt.sub,
+        method = method, exec = exec, msa.program = msa.program,
+        files = msa_out[stend[i,1]:stend[i,2]])
     }
   }
   close(pb)
-
-
-
-  ## unlist
-  alt_msas <- foreach(i = 1:length(alt_msas), .combine = c) %do% {
-    alt_msas[[i]]
-  }
 
 
   ##############################################
@@ -204,15 +230,7 @@ HoT_dev <- function(sequences,
       colnames(alt_msas[[i]]))]
   }
 
-  ## Run comparison
-  if (!parallel){
-    pb <- txtProgressBar(max = length(alt_msas), style = 3)
-    altres <- foreach(i = 1:length(alt_msas),
-      .export = 'calc_scores') %do% {
-        setTxtProgressBar(pb, i)
-        calc_scores(ref = base.msa.t, com = alt_msas[[i]])
-      }
-  }
+  ## Run scores program msa_set_score
   if (parallel){
     pb <- txtProgressBar(max = length(alt_msas), style = 3)
     progress <- function(n) setTxtProgressBar(pb, n)
@@ -221,54 +239,123 @@ HoT_dev <- function(sequences,
     cl <- makeCluster(ncore)
     registerDoSNOW(cl)
     altres <- foreach(i = 1:length(alt_msas), .options.snow = opts,
-      .export = 'calc_scores') %dopar% {
+      .export = 'calc_scores', .packages = 'ips') %dopar% {
+        guide.msa <- read.fas(msa_out[i], type = type)
+        guide.msa <- data.frame(t(as.character(guide.msa)))
+        guide.msa <- guide.msa[,match(colnames(base.msa.t), colnames(guide.msa))]
         calc_scores(ref = base.msa.t, com = alt_msas[[i]])
       }
     stopCluster(cl)
   }
+  if (!parallel){
+    pb <- txtProgressBar(max = length(alt_msas), style = 3)
+    altres <- foreach(i = 1:length(alt_msas),
+      .export = 'calc_scores') %do% {
+        setTxtProgressBar(pb, i)
+        guide.msa <- read.fas(msa_out[i], type = type)
+        guide.msa <- data.frame(t(as.character(guide.msa)))
+        guide.msa <- guide.msa[,match(colnames(base.msa.t), colnames(guide.msa))]
+        calc_scores(ref = base.msa.t, com = alt_msas[[i]])
+      }
+  }
   close(pb)
 
-  ## Column Reliability
-  crb <- do.call(cbind, lapply(altres, function(x) x[[1]]))
-  del <- grep("V1", names(crb))
-  crb <- crb[, -del[2:length(del)]]
-  crb <- data.frame(col = crb[, 1], guidance_score = rowMeans(crb[,2:ncol(crb)]))
 
-  ## alignment reliability
-  alignment_reliability <- mean(crb[, 2])
+  ##  if wanted, store alternative MSAs into a zip file
+  if(!missing(alt.msas.file)){
+    files <- list.files(tempdir())
+    files <- files[grep("HoT", files)]
+    for(i in 1:(n.coopt*bootstrap)){
+      file.rename(paste(tempdir(), files[i], sep="/"),
+        paste(tempdir(), paste("altMSA", i, ".fas",sep=""), sep="/"))}
+    files <- list.files(tempdir(), full.names = TRUE)
+    files <- files[grep("altMSA*", files)]
+    zip(zipfile = alt.msas.file, files = files)
 
-  ## residue reliability
-  rrb <- do.call(cbind, lapply(altres, function(x) x[[2]]))
-  del <- grep("V1|V2", names(rrb))
-  rrb <- rrb[,-del[3:length(del)]]
-  rrb <- data.frame(rrb[,1:2], rowMeans(rrb[,3:ncol(rrb)]))
-  colnames(rrb) <- c("col", "row", "residue_score")
+    # maybe better to use gzfile
+    ## currently zip creates many wired subfolders
+  }
 
-  ## sequencesuence reliability
-  srb <- do.call(cbind, lapply(altres, function(x) x[[3]]))
-  del <- grep("V1", names(srb))
-  srb <- srb[,-del[2:length(del)]]
-  srb <- data.frame(row = srb[,1], sequencesuence_score = rowMeans(srb[,2:ncol(srb)]))
+  ## delete temporary files in temporary directory
+  unlink(msa_out[file.exists(msa_out)], force = TRUE)
+  # unlink(tempdir(), force = TRUE) # do not use this, it causes problems
 
+  ### Calculate mean scores
+  #------------------------------
+  # Mean score
+  msc <- do.call(rbind, lapply(altres, function(x) x[[1]]))
+  msc[] <- lapply(msc, as.numeric)
+  msc <- colMeans(msc)
+  msc <- data.frame(msc)
 
+  ## Column score
+  CS <- do.call(cbind, lapply(altres, function(x) x[[2]]))
+  del <- grep("col", names(CS))
+  CS <- CS[, -del[2:length(del)]]
+  CS <- data.frame(col = CS[, 1],
+    column_score = rowMeans(CS[,2:ncol(CS)], na.rm = TRUE))
 
+  ## Residue pair column score (GUIDANCE Score)
+  g.cs <- do.call(cbind, lapply(altres, function(x) x[[3]]))
+  del <- grep("col\\b", names(g.cs))
+  g.cs <- g.cs[, -del[2:length(del)]]
+  g.cs <- data.frame(col = g.cs[, 1],
+    res_pair_col_score = rowMeans(g.cs[,2:ncol(g.cs)], na.rm = TRUE))
+
+  ## GUIDANCE Alignment score
+  alignment_score <- mean(g.cs[, 2])
+  msc <- rbind(msc, MEAN_GUIDANCE_SCORE = alignment_score)
+
+  # Residue pair residue score
+  rpr.sc <- do.call(cbind, lapply(altres, function(x) x[[4]]))
+  del <- grep("col\\b|residue", names(rpr.sc))
+  rpr.sc <- rpr.sc[, -del[3:length(del)]]
+  rpr.sc <- data.frame(col = rpr.sc[, 1], residue = rpr.sc[, 2],
+    res_pair_res_score = rowMeans(rpr.sc[,3:ncol(rpr.sc)], na.rm = TRUE))
+
+  # Residual pair sequence pair score
+  rpsp.sc <- do.call(cbind, lapply(altres, function(x) x[[5]]))
+  del <- grep("seq_row1|seq_row2", names(rpsp.sc))
+  rpsp.sc <- rpsp.sc[, -del[3:length(del)]]
+  rpsp.sc <- data.frame(seq1 = rpsp.sc[, 1], seq2 = rpsp.sc[, 2],
+    res_pair_seq_pair_score = rowMeans(rpsp.sc[,3:ncol(rpsp.sc)], na.rm = TRUE))
+
+  # Residual pair sequence score
+  rps.sc <- do.call(cbind, lapply(altres, function(x) x[[6]]))
+  del <- grep("seq", names(rps.sc))
+  rps.sc <- rps.sc[, -del[2:length(del)]]
+  rps.sc <- data.frame(seq = rps.sc[, 1],
+    res_pair_seq_score = rowMeans(rps.sc[,2:ncol(rps.sc)], na.rm = TRUE))
+
+  # Residue pair score
+  rp.sc <- do.call(cbind, lapply(altres, function(x) x[[7]]))
+  del <- grep("col|row1|row2", names(rp.sc))
+  rp.sc <- rp.sc[, -del[4:length(del)]]
+  rp.sc <- data.frame(col = rp.sc[, 1], row1 = rp.sc[,2], col2 = rp.sc[,3],
+    res_pair_score = rowMeans(rp.sc[,4:ncol(rp.sc)], na.rm = TRUE))
+  ### Calculate mean scores DONE
+  # maybe put this into a own function
+
+  msa <- HoT.msa <- base.msa
   ## masking residues below cutoff
-  if (mask.cutoff>0 ){
+  if (mask.cutoff>0){
     txt <- as.vector(as.character(base.msa))
-    mat <- data.frame(rrb, txt)
-    rown <- max(mat$row)
+    mat <- data.frame(rpr.sc, txt)
+    rown <- max(mat$residue)
     coln <- max(mat$col)
-    msa <- matrix(mat$residue_score, nrow = rown, ncol = coln)
+    res_mat <- matrix(mat$res_pair_res_score, nrow = rown, ncol = coln)
 
     if (mask.cutoff=="auto"){ mask.cutoff <- 0.50 }
 
     if (inherits(sequences, "DNAbin")){
-      msa[msa<mask.cutoff & !is.na(msa)] <- "N"
-      mask.msa <- as.DNAbin(msa)
-      rownames(mask.msa) <- labels(sequences)
+      msa <- as.character(msa)
+      msa[res_mat<mask.cutoff & !is.na(res_mat)] <- "N"
+      msa <- as.DNAbin(msa)
+      rownames(msa) <- labels(sequences)
     }
     if (inherits(sequences, "AAbin")) {
-      msa[msa<mask.cutoff & !is.na(msa)] <- "X"
+      msa <- as.character(msa)
+      msa[res_mat<mask.cutoff & !is.na(res_mat)] <- "X"
       rownames(msa) <- labels(sequences)
       class(msa) <- "AAbin"
     }
@@ -276,25 +363,34 @@ HoT_dev <- function(sequences,
   }
   ## remove unreliable columns
   if (col.cutoff>0){
-    ifelse(mask.cutoff>0, msa <- HoT.msa, msa <- base.msa)
+    if (mask.cutoff>0) { msa <- HoT.msa
+    } else { msa <- base.msa }
     if(col.cutoff =="auto"){col.cutoff <- 0.97}
-    remove_cols <- crb[,2] < col.cutoff
+    remove_cols <- g.cs[,2] < col.cutoff
     HoT.msa <- msa[,!remove_cols]
   }
   ## remove unreliable sequences
   if (seq.cutoff>0){
-    ifelse(mask.cutoff>0, msa <- HoT.msa, msa <- base.msa)
+    if (mask.cutoff>0) { msa <- HoT.msa
+    } else { msa <- base.msa }
     if (seq.cutoff =="auto"){seq.cutoff <- 0.5}
-    remove_seq <- srb$sequencesuence_score < seq.cutoff
-    HoT.msa <- HoT.msa[!remove_seq,]
+    remove_sequences <- rps.sc$res_pair_seq_score < seq.cutoff
+    HoT.msa <- msa[!remove_sequences,]
   }
 
+  ## prepare base.msa for output
+  if(inherits(sequences, "DNAbin")){   base.msa <- as.DNAbin(base.msa) }
+  if(inherits(sequences, "AAbin")) {   base.msa <- as.AAbin(base.msa)  }
 
-  res <-  list(alignment_reliability = alignment_reliability,
-    residue_reliability = rrb,
-    column_reliability = crb,
-    sequence_reliability = srb,
-    HoT_MSA = HoT.msa,
+  ## Produce output
+  res <- list(mean_score = msc,
+    column_score = CS,
+    GUIDANCE_column_score = g.cs,
+    residue_pair_residue_score = rpr.sc,
+    residual_pair_sequence_pair_score  = rpsp.sc,
+    residual_pair_sequence_score = rps.sc,
+    residue_pair_score = rp.sc,
+    HoT_msa = HoT.msa,
     base_msa = base.msa)
 
   return(res)

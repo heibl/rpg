@@ -4,7 +4,7 @@
 \alias{HoT_dev}
 \title{Heads or Tails alignment reliability}
 \usage{
-HoT_dev(sequences, msa.program = "mafft", exec, n.part = "auto",
+HoT_dev(sequences, msa.program = "mafft", exec, type, n.coopt,
   col.cutoff = "auto", seq.cutoff = "auto", mask.cutoff = "auto",
   parallel = FALSE, ncore, method = "auto", plot_guide = TRUE)
 }
@@ -18,7 +18,7 @@ one of c("mafft", "muscle", "clustalo", "clustalw2"); MAFFT is default}
 \item{exec}{A character string giving the path to the executable of the
 alignment program.}
 
-\item{n.part}{number of co-optimal alignments should be used (must be integer < Ntip - 3)}
+\item{n.coopt}{number of co-optimal alignments should be used (must be integer < Ntip - 3)}
 
 \item{col.cutoff}{numberic between 0 and 1; specifies a cutoff to remove unreliable columns below the cutoff; either user supplied or "auto" (0.73)}
 

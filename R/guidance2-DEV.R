@@ -3,8 +3,6 @@
 #' @param seq is the raw input sequences of class DNAbin (DNA) or SeqFastaAA (AA)
 #' @param cutoff specifies a cutoff to remove unreliable columns below the cutoff
 #' @title Alignment Confidence Scores with GUIDANCE
-#' @description Assess uncertainty in multiple sequence aligment (MSA) with the
-#'   GUIDANCE algorithm (Penn et al. 2010).
 #' @param seqs An object of class \code{\link{DNAbin}} or \code{\link{AAbin}}
 #'   containing unaligned sequences of DNA or amino acids.
 #' @param cutoff specifies a cutoff to remove unreliable columns below the
@@ -13,12 +11,14 @@
 #' @param ncore number of cores
 #' @param bootstrap An integer giving the number of perturbated MSAs.
 #' @param msa.program A charcter string giving the name of the MSA program,
-#'   currelty either \code{"mafft"} (default) or\code{"prank"}.
+#'   currelty one of c("mafft", "muscle", "clustalw2"); MAFFT is default
 #' @param exec A character string giving the path to the executable of the
 #'   alignment program.
 #' @param method further arguments passed to mafft, default is "auto"
 #' @param mask specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA)
 #'
+#' @description Assess uncertainty in multiple sequence aligment (MSA) with the
+#'   GUIDANCE2 algorithm based on GUIDANCE (Penn et al. 2010) and HoT (G. Landan and D. Graur 2008)
 #' @return alignment_score: is the GUIDANCE alignment score
 #' @return GUIDANCE_residue_score
 #' @return GUIDANCE_score: is the GUIDANCE column score
@@ -38,6 +38,8 @@
 #' @references Penn et al. (2010). An alignment confidence score capturing
 #'   robustness to guide tree uncertainty. Molecular Biology and Evolution
 #'   27:1759--1767
+#' @references Sela et al. (2015). GUIDANCE2: accurate detection of unreliable alignment regions accounting for the uncertainty of multiple parameters. Nucleic acids research 43:W7--W14
+#' @references G. Landan and D. Graur (2008). Local reliability measures from sets of co-optimal multiple sequencesuence alignments. Pacific Symposium on Biocomputin. 13:15--24
 #'
 #' @importFrom ips mafft
 #' @import doSNOW
@@ -52,3 +54,461 @@
 #' @export
 
 
+
+guidance2 <- function(sequences,
+  msa.program = "mafft", exec,
+  bootstrap = 100,
+  n.part="auto",
+  col.cutoff = "auto",
+  seq.cutoff = "auto",
+  mask.cutoff = "auto",
+  parallel = TRUE, ncore ="auto",
+  method = "auto",
+  alt.msas.file,
+  n.coopt = "auto"){
+
+  ##############################################
+  ## SOME CHECKS
+  ##############################################
+  if (!inherits(sequences, c("DNAbin", "AAbin")))
+    stop("sequences not of class DNAbin or AAbin (ape)")
+
+
+  ## Check for MSA program
+  if(missing(exec)){
+    os <- Sys.info()[1]
+    if (msa.program =="mafft") {
+      exec <- switch(os, Linux = "mafft", Darwin = "mafft",
+        Windows = "mafft.bat")
+    }
+    if (msa.program =="muscle") {
+      exec <- switch(os, Linux = "muscle", Darwin = "muscle",
+        Windows = "muscle3.8.31_i86win32.exe")
+    }
+    if (msa.program =="clustalw2") {
+      exec <- switch(os, Linux = "clustalw", Darwin = "clustalw2",
+        Windows = "clustalw2.exe")
+    }
+  }
+  out <- system(paste(exec, "--v", sep=" "), ignore.stdout = TRUE, ignore.stderr = TRUE)
+  if (out == 127)
+    stop("please provide exec path or install MSA program in root \n
+      i.e. in Unix: '/usr/local/bin/mafft'")
+
+
+  ## generate some parameters if not specified
+  #---------------------------------------------
+  ## number of cores
+  if(ncore=="auto"){
+    ncore <- detectCores(all.tests = FALSE, logical = TRUE)
+  }
+
+  ## specify number of sampled co-optimal MSAs from HoT
+  if(n.coopt == "auto"){ n.coopt <- 4 }
+
+  ## set type of the sequences data
+  type <- class(sequences)
+  type <- gsub("bin", "", type)
+
+  ##############################################
+  ## PART I
+  ##############################################
+  ## BASE and PERTUBATED MSAs
+  ##############################################
+
+  ## Generate BASE alignment
+  ###########################
+  cat("Generating the base alignment")
+  if (msa.program == "mafft"){
+    base.msa <- mafft(sequences, method = method, exec = exec)
+  }
+  if (msa.program == "muscle"){
+    base.msa <- muscle2(sequences, exec = exec)
+  }
+  if (msa.program == "clustalw2"){
+    base.msa <- clustalw2(x = sequences, exec = exec)
+  }
+
+  cat("... done \n")
+
+  ## form into matrix for perturbation
+  base.msa <- as.character(base.msa)
+
+  ## Constructing BP guide-trees for the pertubated MSAs
+  #######################################################
+  cat("Pertubating base alignment\n")
+
+  pb <- txtProgressBar(max = bootstrap, style = 3)
+  if(inherits(sequences, "DNAbin")){
+    base.msa.bp <- foreach(i = 1:bootstrap) %do% {
+      setTxtProgressBar(pb, i)
+      as.DNAbin(base.msa[,sample(ncol(base.msa), replace = TRUE)])
+    }
+  }
+  if(inherits(sequences, "AAbin")){
+    base.msa.bp <- foreach(i = 1:bootstrap) %do% {
+      setTxtProgressBar(pb, i)
+      as.AAbin(base.msa[,sample(ncol(base.msa), replace = TRUE)])
+
+    }
+  }
+  close(pb)
+
+  ## Generating alternative (pertubated) MSAs
+  #--------------------------------------------
+  cat("Generating alternative alignments (GUIDANCE) \n")
+
+  ## Compute NJ guide trees
+  cat("  Generating NJ guide trees \n")
+  if (parallel){
+    pb <- txtProgressBar(max = bootstrap, style = 3)
+    progress <- function(n) setTxtProgressBar(pb, n)
+    opts <- list(progress = progress)
+
+    cl <- makeCluster(ncore)
+    registerDoSNOW(cl)
+    nj.guide.trees <- foreach(i = 1:bootstrap,
+      .options.snow = opts, .packages = "phangorn") %dopar% {
+        # convert to class phyDAT
+        base.msa.ml <- as.phyDat(as.character(base.msa.bp[[i]]))
+        # find ML distance as input to nj tree search
+        ml.dist.msa <- dist.ml(base.msa.ml)
+        # NJ
+        ape::nj(ml.dist.msa)
+      }
+    stopCluster(cl)
+  }
+  if (!parallel){
+    nj.guide.trees <- foreach(i = 1:bootstrap, .packages = "phangorn") %do% {
+      setTxtProgressBar(pb, i)
+      # convert to class phyDAT
+      base.msa.ml <- as.phyDat(base.msa.bp[[i]])
+      # find ML distance as input to nj tree search
+      ml.dist.msa <- dist.ml(base.msa.ml)
+      # NJ
+      ape::nj(ml.dist.msa)
+    }
+  }
+  close(pb)
+
+
+  ## Find NJ tree for base MSA
+  ## 1st tip label of base.nj tree as outgroup for all guide.njs
+  base.nj <- ape::nj(dist.ml(as.phyDat(base.msa)))
+  base.nj <- root(base.nj, outgroup = base.nj$tip.label[1])
+
+  ## Root each tree on the first tip label of the base.nj tree
+  nj.guide.trees <- lapply(nj.guide.trees, root,
+    outgroup = base.nj$tip.label[1],
+    resolve.root = TRUE)
+
+  ## Rescale branch lengths
+  nj.guide.trees <- lapply(nj.guide.trees, multi2di)
+  nj.guide.trees <- lapply(nj.guide.trees, compute.brlen)
+
+
+  ## Alignment of MSA BP times with new NJ guide trees
+  ## -------------------------------------------------
+  cat("\n  Alignment of pertubated MSAs using NJ guide trees \n")
+
+
+  ## Prepare TEMP files for all outputs (GUIDANCE + HoT)
+  msa_out <- vector(length = (bootstrap+ (bootstrap*n.coopt)))
+  for (i in 1:bootstrap)
+    msa_out[i] <- tempfile(pattern = "mafft", tmpdir = tempdir(), fileext = ".fas")
+  for (i in 1:(bootstrap*n.coopt))
+    msa_out[i+bootstrap] <- tempfile(pattern = "HoT", tmpdir = tempdir(), fileext = ".fas")
+  unlink(msa_out[file.exists(msa_out)])
+
+
+  ## Align perturbated MSAs (GUIDANCE)
+  pb <- txtProgressBar(max = bootstrap, style = 3)
+  if (parallel){
+    progress <- function(n) setTxtProgressBar(pb, n)
+    opts <- list(progress = progress)
+    cl <- makeCluster(ncore)
+    registerDoSNOW(cl)
+
+    if (msa.program == "mafft"){
+      foreach(i = 1:bootstrap, .packages=c('ips', 'ape', 'rpg'),
+        .options.snow = opts)  %dopar% {
+          mafft2(x = sequences, gt = nj.guide.trees[[i]],
+            exec = exec, file = msa_out[i], method = method,
+            op = runif(1,0,5))
+        }
+    }
+    if (msa.program == "muscle"){
+      foreach(i = 1:bootstrap, .packages=c('ips', 'ape', 'rpg'),
+        .options.snow = opts)  %dopar% {
+          muscle2(x = sequences, gt = nj.guide.trees[[i]],
+            exec = exec,
+            file = msa_out[i],
+            MoreArgs = paste("-gapopen ",
+              format(runif(1, -400, -10), digits = 0), sep =""))
+        }
+    }
+    if (msa.program == "clustalw2"){
+      foreach(i = 1:bootstrap, .packages=c('ips', 'ape', 'rpg'),
+        .options.snow = opts)  %dopar% {
+          clustalw2(x = sequences, gt = nj.guide.trees[[i]],
+            exec = exec, file = msa_out[i],
+            MoreArgs = paste("-PAIRGAP=", format(runif(1, 1, 9), digits = 0), sep =""))
+        }
+    }
+    stopCluster(cl)
+  }
+
+  if (!parallel){
+    if (msa.program == "mafft"){
+      foreach(i = 1:bootstrap, .packages=c('ips', 'ape'))  %do% {
+        setTxtProgressBar(pb, i)
+        mafft2(x = sequences, gt = nj.guide.trees[[i]],
+          method = method, exec = exec, file = msa_out[i],
+          op = runif(1,0,5))
+      }
+    }
+    if (msa.program == "muscle"){
+      foreach(i = 1:bootstrap, .packages=c('ips', 'ape'))  %do% {
+        setTxtProgressBar(pb, i)
+        muscle2(x = sequences, gt = nj.guide.trees[[i]],
+          exec = exec, file = msa_out[i],
+          MoreArgs = paste("-gapopen ", format(runif(1, -400, -10), digits = 0), sep =""))
+      }
+    }
+    if (msa.program == "clustalw2"){
+      foreach(i = 1:bootstrap, .packages=c('ips', 'ape'))  %do% {
+        setTxtProgressBar(pb, i)
+        clustalw2(x = sequences, gt = nj.guide.trees[[i]],
+          exec = exec, file = msa_out[i],
+          MoreArgs = paste("--PAIRGAP= ", format(runif(1, 1, 9), digits = 0), sep =""))
+      }
+    }
+  }
+  close(pb)
+
+  mafft_created <- list.files(getwd(),
+    full.names = T)[grep("tree.mafft", list.files(getwd()))]
+  if(length(mafft_created)>0){
+    file.remove(mafft_created)
+  }
+
+
+
+  ##############################################
+  ## PART III
+  ##############################################
+  ## Generate co-optimal alignments with HoT
+  ##############################################
+  cat(paste("Sampling", n.coopt, "co-optimal alignments (HoT) \n", sep=" "))
+
+  # predifined file allocation
+  start <- seq(1,n.coopt*bootstrap,n.coopt)
+  end <- seq(n.coopt,n.coopt*bootstrap,n.coopt)
+  stend <- data.frame(start, end)
+  stend <- stend + bootstrap
+
+  ## run HoT
+  pb <- txtProgressBar(max = bootstrap, style = 3)
+
+  if(parallel){
+    progress <- function(n) setTxtProgressBar(pb, n)
+    opts <- list(progress = progress)
+    cl <- makeCluster(ncore)
+    registerDoSNOW(cl)
+
+    foreach(i = 1:bootstrap,.options.snow = opts,
+      .packages = c('rpg', 'ips', 'adephylo', 'foreach', 'phangorn')) %dopar% {
+      Hot_GUIDANCE2(msa = msa_out[i], n.coopt = n.coopt,
+      type = type, files = msa_out[stend[i,1]:stend[i,2]],
+        raw_seq = sequences, msa.program = msa.program,
+        method = method, exec = exec)
+      }
+    stopCluster(cl)
+  }
+  if(!parallel){
+    foreach(i = 1:bootstrap) %do% {
+      setTxtProgressBar(pb, i)
+      Hot_GUIDANCE2(msa = msa_out[i], n.coopt = n.coopt,
+        type = type, files = msa_out[stend[i,1]:stend[i,2]],
+        raw_seq = sequences, msa.program = msa.program,
+        method= method, exec = exec)
+    }
+  }
+  close(pb)
+
+
+  ##############################################
+  ## PART IV
+  ##############################################
+  ## Computation of GUIDANCE 2 scores
+  ##############################################
+  cat("Calculating GUIDANCE2 scores \n")
+
+  # ## GUIDANCE Score
+  # ##############################################
+
+  ## produce input format for msa_set_score program
+  # transfrom character matrix (sequences are columns)
+  base.msa.t <- data.frame(t(base.msa))
+
+  pb <- txtProgressBar(max = bootstrap, style = 3)
+  if (parallel){
+    progress <- function(n) setTxtProgressBar(pb, n)
+    opts <- list(progress = progress)
+    cl <- makeCluster(ncore)
+    registerDoSNOW(cl)
+
+    bpres <- foreach(i = (bootstrap+1):length(msa_out), .options.snow = opts,
+      .export = 'calc_scores', .packages = "ips") %dopar% {
+        guide.msa <- read.fas(msa_out[i], type = type)
+        guide.msa <- data.frame(t(as.character(guide.msa)))
+        guide.msa <- guide.msa[,match(colnames(base.msa.t), colnames(guide.msa))]
+        calc_scores(ref = base.msa.t, com = guide.msa)
+      }
+    stopCluster(cl)
+  }
+  if (!parallel){
+    bpres <- foreach(i = (bootstrap+1):length(msa_out), .export = 'calc_scores',
+      .packages = 'ips') %do% {
+        setTxtProgressBar(pb, i)
+        guide.msa <- read.fas(msa_out[i], type =type)
+        guide.msa <- data.frame(t(as.character(guide.msa)))
+        guide.msa <- guide.msa[,match(colnames(base.msa.t), colnames(guide.msa))]
+        calc_scores(ref = base.msa.t, com = guide.msa)
+      }
+  }
+  close(pb)
+
+  ##  if wanted, store alternative MSAs into a zip file
+  if(!missing(alt.msas.file)){
+    files <- list.files(tempdir())
+    files <- files[grep("HoT", files)]
+    for(i in 1:(n.coopt*bootstrap)){
+      file.rename(paste(tempdir(), files[i], sep="/"),
+        paste(tempdir(), paste("altMSA", i, ".fas",sep=""), sep="/"))}
+    files <- list.files(tempdir(), full.names = TRUE)
+    files <- files[grep("altMSA*", files)]
+    zip(zipfile = alt.msas.file, files = files)
+
+    # maybe better to use gzfile
+    ## currently zip creates many wired subfolders
+  }
+
+  ## delete temporary files in temporary directory
+  unlink(msa_out[file.exists(msa_out)], force = TRUE)
+  # unlink(tempdir(), force = TRUE) # do not use this, it causes problems
+
+
+  ### Calculate mean scores
+  #------------------------------
+  # Mean score
+  msc <- do.call(rbind, lapply(bpres, function(x) x[[1]]))
+  msc[] <- lapply(msc, as.numeric)
+  msc <- colMeans(msc)
+  msc <- data.frame(msc)
+
+  ## Column score
+  CS <- do.call(cbind, lapply(bpres, function(x) x[[2]]))
+  del <- grep("col", names(CS))
+  CS <- CS[, -del[2:length(del)]]
+  CS <- data.frame(col = CS[, 1],
+    column_score = rowMeans(CS[,2:ncol(CS)], na.rm = TRUE))
+
+  ## Residue pair column score (GUIDANCE Score)
+  g.cs <- do.call(cbind, lapply(bpres, function(x) x[[3]]))
+  del <- grep("col\\b", names(g.cs))
+  g.cs <- g.cs[, -del[2:length(del)]]
+  g.cs <- data.frame(col = g.cs[, 1],
+    res_pair_col_score = rowMeans(g.cs[,2:ncol(g.cs)], na.rm = TRUE))
+
+  ## GUIDANCE Alignment score
+  alignment_score <- mean(g.cs[, 2])
+  msc <- rbind(msc, MEAN_GUIDANCE_SCORE = alignment_score)
+
+  # Residue pair residue score
+  rpr.sc <- do.call(cbind, lapply(bpres, function(x) x[[4]]))
+  del <- grep("col\\b|residue", names(rpr.sc))
+  rpr.sc <- rpr.sc[, -del[3:length(del)]]
+  rpr.sc <- data.frame(col = rpr.sc[, 1], residue = rpr.sc[, 2],
+    res_pair_res_score = rowMeans(rpr.sc[,3:ncol(rpr.sc)], na.rm = TRUE))
+
+  # Residual pair sequence pair score
+  rpsp.sc <- do.call(cbind, lapply(bpres, function(x) x[[5]]))
+  del <- grep("seq_row1|seq_row2", names(rpsp.sc))
+  rpsp.sc <- rpsp.sc[, -del[3:length(del)]]
+  rpsp.sc <- data.frame(seq1 = rpsp.sc[, 1], seq2 = rpsp.sc[, 2],
+    res_pair_seq_pair_score = rowMeans(rpsp.sc[,3:ncol(rpsp.sc)], na.rm = TRUE))
+
+  # Residual pair sequence score
+  rps.sc <- do.call(cbind, lapply(bpres, function(x) x[[6]]))
+  del <- grep("seq", names(rps.sc))
+  rps.sc <- rps.sc[, -del[2:length(del)]]
+  rps.sc <- data.frame(seq = rps.sc[, 1],
+    res_pair_seq_score = rowMeans(rps.sc[,2:ncol(rps.sc)], na.rm = TRUE))
+
+  # Residue pair score
+  rp.sc <- do.call(cbind, lapply(bpres, function(x) x[[7]]))
+  del <- grep("col|row1|row2", names(rp.sc))
+  rp.sc <- rp.sc[, -del[4:length(del)]]
+  rp.sc <- data.frame(col = rp.sc[, 1], row1 = rp.sc[,2], col2 = rp.sc[,3],
+    res_pair_score = rowMeans(rp.sc[,4:ncol(rp.sc)], na.rm = TRUE))
+  ### Calculate mean scores DONE
+  # maybe put this into a own function
+
+  msa <- guidance2.msa <- base.msa
+  ## masking residues below cutoff
+  if (mask.cutoff>0){
+    txt <- as.vector(as.character(base.msa))
+    mat <- data.frame(rpr.sc, txt)
+    rown <- max(mat$residue)
+    coln <- max(mat$col)
+    res_mat <- matrix(mat$res_pair_res_score, nrow = rown, ncol = coln)
+
+    if (mask.cutoff=="auto"){ mask.cutoff <- 0.50 }
+
+    if (inherits(sequences, "DNAbin")){
+      msa[res_mat<mask.cutoff & !is.na(res_mat)] <- "N"
+      msa <- as.DNAbin(msa)
+      rownames(msa) <- labels(sequences)
+    }
+    if (inherits(sequences, "AAbin")) {
+      msa[res_mat<mask.cutoff & !is.na(res_mat)] <- "X"
+      rownames(msa) <- labels(sequences)
+      class(msa) <- "AAbin"
+    }
+    guidance2.msa <- msa
+  }
+  ## remove unreliable columns
+  if (col.cutoff>0){
+    if (mask.cutoff>0) { msa <- guidance2.msa
+    } else { msa <- base.msa }
+    if(col.cutoff =="auto"){col.cutoff <- 0.97}
+    remove_cols <- g.cs[,2] < col.cutoff
+    guidance2.msa <- msa[,!remove_cols]
+  }
+  ## remove unreliable sequences
+  if (seq.cutoff>0){
+    if (mask.cutoff>0) { msa <- guidance2.msa
+    } else { msa <- base.msa }
+    if (seq.cutoff =="auto"){seq.cutoff <- 0.5}
+    remove_sequences <- rps.sc$res_pair_seq_score < seq.cutoff
+    guidance2.msa <- msa[!remove_sequences,]
+  }
+
+  ## prepare base.msa for output
+  if(inherits(sequences, "DNAbin")){   base.msa <- as.DNAbin(base.msa) }
+  if(inherits(sequences, "AAbin")) {   base.msa <- as.AAbin(base.msa)  }
+
+  ## Produce output
+  res <- list(mean_score = msc,
+    column_score = CS,
+    GUIDANCE_column_score = g.cs,
+    residue_pair_residue_score = rpr.sc,
+    residual_pair_sequence_pair_score  = rpsp.sc,
+    residual_pair_sequence_score = rps.sc,
+    residue_pair_score = rp.sc,
+    guidance2_msa = guidance2.msa,
+    base_msa = base.msa)
+
+  return(res)
+}

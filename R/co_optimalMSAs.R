@@ -7,7 +7,13 @@
 #' @export
 
 
-align_part_set <- function(x, partition_set, exec, method, msa.program, type =type){
+align_part_set <- function(x, partition_set, exec,
+  method, msa.program,
+  coopt.sub = "all"){
+
+  if(coopt.sub=="all"){
+    coopt.sub <- 1:8
+  }
 
   seq_left <- x[partition_set>0]
   seq_right <- x[partition_set==0]
@@ -34,35 +40,51 @@ align_part_set <- function(x, partition_set, exec, method, msa.program, type =ty
   # aling 4 combinations of the basic MSAs (heads) and also
   # align in revers direction (tails)
   # headsA - headsB - HEADS
-  msa1 <- mafft(x = headsA, y = headsB, add = "add",
-    method= method, exec = exec)
+    if(1 %in% coopt.sub){
+      msa1 <- mafft(x = headsA, y = headsB, add = "add",
+        method= method, exec = exec)
+    }
   # headsA - headsB - TAILS
-  msa2 <- mafft(x = rev_DNA(headsA), y = rev_DNA(headsB), add = "add",
-    method= method, exec = exec)
-  msa2 <- rev_DNA(msa2)
+    if(2 %in% coopt.sub){
+      msa2 <- mafft(x = rev_DNA(headsA), y = rev_DNA(headsB), add = "add",
+        method= method, exec = exec)
+      msa2 <- rev_DNA(msa2)
+    }
   # headsA - tailsB - HEADS
-  msa3 <- mafft(headsA, rev_DNA(tailsB), add = "add",
-    method= method, exec = exec)
+    if(3 %in% coopt.sub){
+      msa3 <- mafft(headsA, rev_DNA(tailsB), add = "add",
+        method= method, exec = exec)
+    }
   # headsA - tailsB - TAILS
-  msa4 <- mafft(rev_DNA(headsA), tailsB, add = "add",  # rev(rev())=> normal
-    method= method, exec = exec)
-  msa4 <- rev_DNA(msa4)
+    if(4 %in% coopt.sub){
+      msa4 <- mafft(rev_DNA(headsA), tailsB, add = "add",  # rev(rev())=> normal
+        method= method, exec = exec)
+      msa4 <- rev_DNA(msa4)
+    }
   # tailsA - headsB - HEADS
-  msa5 <- mafft(rev_DNA(tailsA), headsB, add = "add",
-    method= method, exec = exec)
+    if(5 %in% coopt.sub){
+      msa5 <- mafft(rev_DNA(tailsA), headsB, add = "add",
+        method= method, exec = exec)
+    }
   # tailsA - headsB - TAILS
-  msa6 <- mafft(tailsA, rev_DNA(headsB), add = "add",
-    method= method, exec = exec)
-  msa6 <- rev_DNA(msa6)
+    if(6 %in% coopt.sub){
+      msa6 <- mafft(tailsA, rev_DNA(headsB), add = "add",
+        method= method, exec = exec)
+      msa6 <- rev_DNA(msa6)
+    }
   # tailsA - tailsB - HEADS
-  msa7 <- mafft(rev_DNA(tailsA), rev_DNA(tailsB), add = "add",
-    method= method, exec = exec)
-  msa8 <- mafft(tailsA, tailsB, add = "add",
-    method= method, exec = exec)
-  msa8 <- rev_DNA(msa8)
-  ## list of 8 combs
-  comb_msas <- list(msa1, msa2, msa3, msa4,
-    msa5, msa6, msa7, msa8)
+    if(7 %in% coopt.sub){
+      msa7 <- mafft(rev_DNA(tailsA), rev_DNA(tailsB), add = "add",
+        method= method, exec = exec)
+    }
+    if(8 %in% coopt.sub){
+      msa8 <- mafft(tailsA, tailsB, add = "add",
+        method= method, exec = exec)
+      msa8 <- rev_DNA(msa8)
+    }
+    ## list of 8 combs
+    list.msas <- paste(paste("msa", coopt.sub, sep=""), collapse =",")
+    comb_msas <- eval(parse(text = paste("list(", list.msas, ")", sep="")))
   }
 
   ## MUSCLE
@@ -72,31 +94,46 @@ align_part_set <- function(x, partition_set, exec, method, msa.program, type =ty
       headsA <-  seq_left
       tailsA <- rev_DNA(seq_left)
     }else{
-      headsA <- muscle2(seq_left, exec = exec, type = type)
-      tailsA <- muscle2(rev_DNA(seq_left), exec = exec, type = type)
+      headsA <- muscle2(seq_left, exec = exec)
+      tailsA <- muscle2(rev_DNA(seq_left), exec = exec)
     }
     if (length(seq_right) ==1){
       headsB <-  seq_right
       tailsB <- rev_DNA(seq_right)
     }else{
-      headsB <- muscle2(seq_right, exec = exec, type = type)
-      tailsB <- muscle2(rev_DNA(seq_right), exec = exec, type = type)
+      headsB <- muscle2(seq_right, exec = exec)
+      tailsB <- muscle2(rev_DNA(seq_right), exec = exec)
     }
-    msa1 <- muscle2(x = headsA, y = headsB, exec = exec, type =type)
-    msa2 <- muscle2(x = rev_DNA(headsA), y = rev_DNA(headsB),
-      exec = exec, type =type)
-    msa2 <- rev_DNA(msa2)
-    msa3 <- muscle2(headsA, rev_DNA(tailsB),  exec = exec, type =type)
-    msa4 <- muscle2(rev_DNA(headsA), tailsB,  exec = exec, type =type)
-    msa4 <- rev_DNA(msa4)
-    msa5 <- muscle2(rev_DNA(tailsA), headsB, exec = exec, type =type)
-    msa6 <- muscle2(tailsA, rev_DNA(headsB), exec = exec, type =type)
-    msa6 <- rev_DNA(msa6)
-    msa7 <- muscle2(rev_DNA(tailsA), rev_DNA(tailsB), exec = exec, type =type)
-    msa8 <- muscle2(tailsA, tailsB, exec = exec, type =type)
-    msa8 <- rev_DNA(msa8)
-    comb_msas <- list(msa1, msa2, msa3, msa4,
-      msa5, msa6, msa7, msa8)
+    if(1 %in% coopt.sub)
+      msa1 <- muscle2(x = headsA, y = headsB, exec = exec)
+
+    if(2 %in% coopt.sub){
+      msa2 <- muscle2(x = rev_DNA(headsA), y = rev_DNA(headsB),
+        exec = exec)
+      msa2 <- rev_DNA(msa2)
+    }
+    if(3 %in% coopt.sub)
+      msa3 <- muscle2(headsA, rev_DNA(tailsB),  exec = exec)
+
+    if(4 %in% coopt.sub){
+      msa4 <- muscle2(rev_DNA(headsA), tailsB,  exec = exec)
+      msa4 <- rev_DNA(msa4)
+    }
+    if(5 %in% coopt.sub)
+      msa5 <- muscle2(rev_DNA(tailsA), headsB, exec = exec)
+
+    if(6 %in% coopt.sub){
+      msa6 <- muscle2(tailsA, rev_DNA(headsB), exec = exec)
+      msa6 <- rev_DNA(msa6)
+    }
+    if(7 %in% coopt.sub)
+      msa7 <- muscle2(rev_DNA(tailsA), rev_DNA(tailsB), exec = exec)
+    if(8 %in% coopt.sub){
+      msa8 <- muscle2(tailsA, tailsB, exec = exec)
+      msa8 <- rev_DNA(msa8)
+      }
+    list.msas <- paste(paste("msa", coopt.sub, sep=""), collapse =",")
+    comb_msas <- eval(parse(text = paste("list(", list.msas, ")", sep="")))
   }
 
 
@@ -107,31 +144,43 @@ align_part_set <- function(x, partition_set, exec, method, msa.program, type =ty
       headsA <-  seq_left
       tailsA <- rev_DNA(seq_left)
     }else{
-      headsA <- clustalo(seq_left, exec = exec, type =type)
-      tailsA <- clustalo(rev_DNA(seq_left), exec = exec, type =type)
+      headsA <- clustalo(seq_left, exec = exec)
+      tailsA <- clustalo(rev_DNA(seq_left), exec = exec)
     }
     if (length(seq_right) ==1){
       headsB <-  seq_right
       tailsB <- rev_DNA(seq_right)
     }else{
-      headsB <- clustalo(seq_right,  exec = exec, type =type)
-      tailsB <- clustalo(rev_DNA(seq_right),exec = exec, type =type)
+      headsB <- clustalo(seq_right,  exec = exec)
+      tailsB <- clustalo(rev_DNA(seq_right),exec = exec)
     }
-    msa1 <- clustalo(x = headsA, y = headsB,exec = exec, type =type)
-    msa2 <- clustalo(x = rev_DNA(headsA), y = rev_DNA(headsB),
-      exec = exec, type =type)
-    msa2 <- rev_DNA(msa2)
-    msa3 <- clustalo(headsA, rev_DNA(tailsB), exec = exec, type =type)
-    msa4 <- clustalo(rev_DNA(headsA), tailsB, exec = exec, type =type)
-    msa4 <- rev_DNA(msa4)
-    msa5 <- clustalo(rev_DNA(tailsA), headsB, exec = exec, type =type)
-    msa6 <- clustalo(tailsA, rev_DNA(headsB), exec = exec, type =type)
-    msa6 <- rev_DNA(msa6)
-    msa7 <- clustalo(rev_DNA(tailsA), rev_DNA(tailsB), exec = exec, type =type)
-    msa8 <- clustalo(tailsA, tailsB,  exec = exec, type =type)
-    msa8 <- rev_DNA(msa8)
-    comb_msas <- list(msa1, msa2, msa3, msa4,
-      msa5, msa6, msa7, msa8)
+    if(1 %in% coopt.sub)
+      msa1 <- clustalo(x = headsA, y = headsB,exec = exec)
+    if(2 %in% coopt.sub){
+      msa2 <- clustalo(x = rev_DNA(headsA), y = rev_DNA(headsB),
+        exec = exec)
+      msa2 <- rev_DNA(msa2)
+    }
+    if(3 %in% coopt.sub)
+      msa3 <- clustalo(headsA, rev_DNA(tailsB), exec = exec)
+    if(4 %in% coopt.sub){
+      msa4 <- clustalo(rev_DNA(headsA), tailsB, exec = exec)
+      msa4 <- rev_DNA(msa4)
+    }
+    if(5 %in% coopt.sub)
+      msa5 <- clustalo(rev_DNA(tailsA), headsB, exec = exec)
+    if(6 %in% coopt.sub){
+      msa6 <- clustalo(tailsA, rev_DNA(headsB), exec = exec)
+      msa6 <- rev_DNA(msa6)
+    }
+    if(7 %in% coopt.sub)
+      msa7 <- clustalo(rev_DNA(tailsA), rev_DNA(tailsB), exec = exec)
+    if(8 %in% coopt.sub){
+      msa8 <- clustalo(tailsA, tailsB,  exec = exec)
+      msa8 <- rev_DNA(msa8)
+    }
+    list.msas <- paste(paste("msa", coopt.sub, sep=""), collapse =",")
+    comb_msas <- eval(parse(text = paste("list(", list.msas, ")", sep="")))
   }
 
 
@@ -142,31 +191,44 @@ align_part_set <- function(x, partition_set, exec, method, msa.program, type =ty
       headsA <-  seq_left
       tailsA <- rev_DNA(seq_left)
     }else{
-      headsA <- clustalw2(seq_left, exec = exec, type =type)
-      tailsA <- clustalw2(rev_DNA(seq_left), exec = exec, type =type)
+      headsA <- clustalw2(seq_left, exec = exec)
+      tailsA <- clustalw2(rev_DNA(seq_left), exec = exec)
     }
     if (length(seq_right) ==1){
       headsB <-  seq_right
       tailsB <- rev_DNA(seq_right)
     }else{
-      headsB <- clustalw2(seq_right,  exec = exec, type =type)
-      tailsB <- clustalw2(rev_DNA(seq_right),exec = exec, type =type)
+      headsB <- clustalw2(seq_right,  exec = exec)
+      tailsB <- clustalw2(rev_DNA(seq_right),exec = exec)
     }
-    msa1 <- clustalw2(x = headsA, y = headsB,exec = exec, type =type)
-    msa2 <- clustalw2(x = rev_DNA(headsA), y = rev_DNA(headsB),
-      exec = exec, type =type)
-    msa2 <- rev_DNA(msa2)
-    msa3 <- clustalw2(headsA, rev_DNA(tailsB), exec = exec, type =type)
-    msa4 <- clustalw2(rev_DNA(headsA), tailsB, exec = exec, type =type)
-    msa4 <- rev_DNA(msa4)
-    msa5 <- clustalw2(rev_DNA(tailsA), headsB, exec = exec, type =type)
-    msa6 <- clustalw2(tailsA, rev_DNA(headsB), exec = exec, type =type)
-    msa6 <- rev_DNA(msa6)
-    msa7 <- clustalw2(rev_DNA(tailsA), rev_DNA(tailsB), exec = exec, type =type)
-    msa8 <- clustalw2(tailsA, tailsB,  exec = exec, type =type)
-    msa8 <- rev_DNA(msa8)
-    comb_msas <- list(msa1, msa2, msa3, msa4,
-      msa5, msa6, msa7, msa8)
+    if(1 %in% coopt.sub)
+      msa1 <- clustalw2(x = headsA, y = headsB,exec = exec)
+    if(2 %in% coopt.sub){
+      msa2 <- clustalw2(x = rev_DNA(headsA), y = rev_DNA(headsB),
+        exec = exec)
+      msa2 <- rev_DNA(msa2)
+    }
+    if(3 %in% coopt.sub){
+      msa3 <- clustalw2(headsA, rev_DNA(tailsB), exec = exec)
+    }
+    if(4 %in% coopt.sub){
+      msa4 <- clustalw2(rev_DNA(headsA), tailsB, exec = exec)
+      msa4 <- rev_DNA(msa4)
+    }
+    if(5 %in% coopt.sub)
+      msa5 <- clustalw2(rev_DNA(tailsA), headsB, exec = exec)
+    if(6 %in% coopt.sub){
+      msa6 <- clustalw2(tailsA, rev_DNA(headsB), exec = exec)
+      msa6 <- rev_DNA(msa6)
+    }
+    if(7 %in% coopt.sub)
+      msa7 <- clustalw2(rev_DNA(tailsA), rev_DNA(tailsB), exec = exec)
+    if(8 %in% coopt.sub){
+      msa8 <- clustalw2(tailsA, tailsB,  exec = exec)
+      msa8 <- rev_DNA(msa8)
+    }
+    list.msas <- paste(paste("msa", coopt.sub, sep=""), collapse =",")
+    comb_msas <- eval(parse(text = paste("list(", list.msas, ")", sep="")))
   }
   return(comb_msas)
 }

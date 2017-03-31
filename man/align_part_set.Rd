@@ -4,7 +4,8 @@
 \alias{align_part_set}
 \title{Co-optimal alignments from tree partitions}
 \usage{
-align_part_set(x, partition_set, exec, method, msa.program, type = type)
+align_part_set(x, partition_set, exec, method, msa.program, type = type,
+  coopt.sub = "all")
 }
 \description{
 Co-optimal alignments from tree partitions
