@@ -11,17 +11,20 @@
 heatmap.msa <- function(obj, file = NULL){
 
   txt <- as.vector(as.character(obj$base_msa))
+  if (length(grep("scores", names(obj))) > 0)
+    obj <- obj$scores
+
   mat <- data.frame(obj$residue_pair_residue_score, txt)
   rown <- max(mat$residue)
   coln <- max(mat$col)
-  res_mat <- matrix(mat$res_pair_res_score, nrow = rown, ncol = coln)
+  res_mat <- matrix(mat$score, nrow = rown, ncol = coln)
 
   ## scales for PDF
   w <- coln/10
   h <- rown/4
 
   p <- ggplot(mat,aes(col, residue)) +
-    geom_tile(aes(fill = res_pair_res_score), colour = "white") +
+    geom_tile(aes(fill = score), colour = "white") +
     scale_fill_gradient(low = "red", high = "yellow") +
     ylab("Sequences (input order)") +
     xlab("Sites") +
@@ -34,14 +37,14 @@ heatmap.msa <- function(obj, file = NULL){
     theme_bw()+
     theme(legend.position="left")+
     theme(legend.title=element_text(size=18) ,
-      legend.text=element_text(size=14),
+      legend.text=element_text(size=12),
       legend.position="top",
       legend.direction="horizontal")+
     guides(fill=guide_legend(title="MSA confidence scale (1=high)"))
 
   if (!is.null(file)){
     pdf(file, width = w, height = h)
-    p <- p + geom_text(data = GRSC, aes(label = txt))
+    p <- p + geom_text(data = mat, aes(label = txt))
     print(p)
     dev.off()
   } else {

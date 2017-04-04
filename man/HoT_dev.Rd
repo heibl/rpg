@@ -4,9 +4,10 @@
 \alias{HoT_dev}
 \title{Heads or Tails alignment reliability}
 \usage{
-HoT_dev(sequences, msa.program = "mafft", exec, type, n.coopt,
+HoT_dev(sequences, msa.program = "mafft", exec, type, n.coopt = "auto",
   col.cutoff = "auto", seq.cutoff = "auto", mask.cutoff = "auto",
-  parallel = FALSE, ncore, method = "auto", plot_guide = TRUE)
+  parallel = FALSE, ncore = "auto", method = "auto", plot_guide = TRUE,
+  alt.msas.file)
 }
 \arguments{
 \item{sequences}{An object of class \code{\link{DNAbin}} or \code{\link{AAbin}}

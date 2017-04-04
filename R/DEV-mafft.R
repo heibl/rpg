@@ -16,7 +16,7 @@
 #'   \code{"retree 1"} and \code{"retree 2"} are for speed-oriented alignment.
 #'   The default is \code{"auto"}, which lets MAFFT choose an appropriate
 #'   alignment method.
-#' @param maxiterate An integer giving the number of cycles of iterative
+#' @param maxiterate An integer giving the number of cycles ofa iterative
 #'   refinement to perform. Possible choices are \code{0}: progressive method,
 #'   no iterative refinement (default); \code{2}: two cycles of iterative
 #'   refinement; \code{1000}: at most 1000 cycles of iterative refinement.

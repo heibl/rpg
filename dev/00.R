@@ -5,41 +5,54 @@ library("foreach")
 library("phangorn")
 library("doSNOW")
 library("adephylo")
-
+library("useful")
+library("stringr")
+library("scales")
+library("ggplot2")
 # 1.	Read example sequences
 ## DNA
-ms <- read.fas("dev/data/cortinarius_28s_ms.fas", type ="DNA")
+seq_dna <- read.fas("dev/data/cortinarius_28s_ms.fas", type ="DNA")
 set.seed(100)
-seq_dna <- sample(ms, 10)
+seq_dna <- sample(seq_dna,10)
 ## Amino Acids
 seq_aa <- read.fas("dev/data/AATF.fas", type ="AA")
 
 
-sequences = seq_aa
+sequences = seq_dna
 parallel = TRUE
 ncore = 4
 bootstrap = 10
 col.cutoff = "auto"
 seq.cutoff = "auto"
 mask.cutoff = "auto"
-msa.program <- "clustalo"
-exec <- "/Applications/clustalo"
+method <- "retree 1"
 msa.program <- "mafft"
 exec <- "/usr/local/bin/mafft"
+
+msa.program <- "clustalo"
+exec <- "/Applications/clustalo"
 msa.program <- "clustalw2"
 exec <- "/Applications/clustalw2"
 msa.program <- "muscle"
 exec <- "/Applications/muscle"
 
-system.time(g_msa <- guidance(sequences = seq_dna,
-  msa.program = "muscle",
-  exec = "/Applications/muscle",
+system.time(g_msa <- guidance(sequences = seq_aa,
+  msa.program = "clustalw2",
+  exec = exec,
   bootstrap = 10,
   col.cutoff = "auto",
   seq.cutoff = "auto",
   mask.cutoff = "auto",
-  parallel = TRUE, ncore = "auto",
-  method = "auto"))
+  parallel = FALSE, ncore = "auto",
+  method = "retree 1"))
+
+system.time(
+guidanceSA(sequences = seq_dna,
+  msa.program = "mafft",
+  programm = "guidance",
+  bootstrap = 100,
+  proc_num = 4)
+)
 
 heatmap.msa(g_msa)
 
@@ -58,7 +71,7 @@ method = "auto"
 plot_guide = TRUE
 n.coopt = "auto"
 
-system.time(hot_msa <- HoT_dev(sequences = seq_dna, # MUSCLE stops after Scores
+system.time(hot_msa <- HoT_dev(sequences = seq_aa, # MUSCLE stops after Scores
   msa.program = "muscle",
   exec = "/Applications/muscle",
   n.coopt = "auto",
@@ -70,10 +83,13 @@ system.time(hot_msa <- HoT_dev(sequences = seq_dna, # MUSCLE stops after Scores
   plot_guide = TRUE,
   alt.msas.file))
 
-system.time(hot_msa <- HoT_dev(sequences = seq_dna,
-  ncore = 4,
-  msa.program = "prank",
-  parallel  = TRUE))
+system.time(
+  hot_sa <- guidanceSA(sequences = seq_dna,
+    msa.program = "mafft",
+    programm = "hot",
+    bootstrap = 100,
+    proc_num = 4)
+)
 
 heatmap.msa(obj = hot_msa)
 
@@ -98,9 +114,10 @@ method = "auto"
 # alt.msas.file
 n.coopt = "auto"
 
-g2 <- guidance2(sequences = seq_dna,
-  msa.program = "clustalw2",
-  exec <- "/Applications/clustalw2",
+system.time(
+g2 <- guidance2(sequences = seq_aa,
+  msa.program = "mafft",
+  # exec <- "/Applications/clustalw2",
   bootstrap = 10,
   n.part="auto",
   col.cutoff = "auto",
@@ -108,7 +125,31 @@ g2 <- guidance2(sequences = seq_dna,
   mask.cutoff = "auto",
   parallel = TRUE, ncore ="auto",
   method = "auto",
-  n.coopt = "auto",
-  alt.msas.file = paste(getwd(), "R", "test", sep="/"))
+  n.coopt = "auto")
+)
+heatmap.msa(obj = g2, file =paste(getwd(), "test.pdf", sep="/"))
 
-heatmap.msa(obj = g2)
+
+
+
+##
+
+# seq_dna <- read.fas("Dropbox/cortinarius_28s_ms.fas", type ="DNA")
+# # set.seed(100)
+# # seq_dna <- sample(sea_dna, 10)
+# sequences = seq_dna
+# msa.program = "mafft"
+# outdir = "test.guidance"
+# programm = "GUIDANCE"
+# bootstrap = 100
+# proc_num = 24
+# gencode
+# outorder
+# msafile
+
+# system.time(gSA <- guidanceSA(sequences = seq_dna,
+#   msa.program = "mafft",
+#   outdir = "test.guidance",
+#   programm = "GUIDANCE",
+#   bootstrap = 100,
+#   proc_num = 12))
