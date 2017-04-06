@@ -8,8 +8,7 @@
 
 
 align_part_set <- function(x, partition_set, exec,
-  method, msa.program,
-  coopt.sub = "all"){
+  method, msa.program, coopt.sub = "all"){
 
   if(coopt.sub=="all"){
     coopt.sub <- 1:8
@@ -23,19 +22,21 @@ align_part_set <- function(x, partition_set, exec,
   if(msa.program == "mafft"){
   ## Aligning left HEADS and TAILS
   if (length(seq_left) == 1){
-    headsA <-  seq_left
-    tailsA <- rev_DNA(seq_left)
+    headsA <- seq_left
+    tailsA <- seq_left
   }else{
     headsA <- mafft(seq_left, exec = exec, method = method)
     tailsA <- mafft(rev_DNA(seq_left), exec = exec, method = method)
+    tailsA <- rev_DNA(tailsA)
   }
   ## Aligning right HEADS and TAILS
   if (length(seq_right) ==1){
-    headsB <-  seq_right
-    tailsB <- rev_DNA(seq_right)
+    headsB <- seq_right
+    tailsB <- seq_right
   }else{
     headsB <- mafft(seq_right, exec = exec, method = method)
     tailsB <- mafft(rev_DNA(seq_right), exec = exec, method = method)
+    tailsB <- rev_DNA(tailsB)
   }
   # aling 4 combinations of the basic MSAs (heads) and also
   # align in revers direction (tails)
@@ -52,23 +53,23 @@ align_part_set <- function(x, partition_set, exec,
     }
   # headsA - tailsB - HEADS
     if(3 %in% coopt.sub){
-      msa3 <- mafft(headsA, rev_DNA(tailsB), add = "add",
+      msa3 <- mafft(headsA, tailsB, add = "add",
         method= method, exec = exec)
     }
   # headsA - tailsB - TAILS
     if(4 %in% coopt.sub){
-      msa4 <- mafft(rev_DNA(headsA), tailsB, add = "add",  # rev(rev())=> normal
+      msa4 <- mafft(rev_DNA(headsA), rev_DNA(tailsB), add = "add",
         method= method, exec = exec)
       msa4 <- rev_DNA(msa4)
     }
   # tailsA - headsB - HEADS
     if(5 %in% coopt.sub){
-      msa5 <- mafft(rev_DNA(tailsA), headsB, add = "add",
+      msa5 <- mafft(tailsA, headsB, add = "add",
         method= method, exec = exec)
     }
   # tailsA - headsB - TAILS
     if(6 %in% coopt.sub){
-      msa6 <- mafft(tailsA, rev_DNA(headsB), add = "add",
+      msa6 <- mafft(rev_DNA(tailsA), rev_DNA(headsB), add = "add",
         method= method, exec = exec)
       msa6 <- rev_DNA(msa6)
     }

@@ -16,7 +16,7 @@
 confidence.heatmap <- function(obj, file = NULL, title, legend.text = TRUE,
   guidance_score = TRUE){
 
-  if (!length(grep("scores", names(obj)))>0)
+  if (!length(grep("score", names(obj)))>0)
     stop("obj is not an output of guidance, guidance2 or HoT")
 
   txt <- as.vector(as.character(obj$base_msa))

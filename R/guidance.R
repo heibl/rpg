@@ -46,6 +46,40 @@
 #'
 #' @seealso \code{\link{compareMSAs}}, \code{\link{guidance2}}, \code{\link{HoT}}
 #'
+#' @examples
+#' \dontrun{
+#' # first run GUIDANCE on example data using MAFFT
+#' file <- system.file("extdata", "BB50009.fasta", package = "rpg")
+#' aa_seq<- read.fas(file, type ="AA")
+#' g_msa <- guidance(sequences = aa_seq,
+#' msa.program = "mafft",
+#' exec = "/usr/local/bin/mafft",
+#' bootstrap = 100,
+#' parallel = FALSE,
+#' method = "retree 1")
+#' h.p <- confidence.heatmap(g_msa, title = "GUIDANCE BB50009 benchmark",
+#' legend = TRUE,guidance_score = TRUE)
+#' h.p
+#' # again with Muscle
+#' g_msa_m <- guidance(sequences = aa_seq,
+#' msa.program = "muscle",
+#' exec = "/Applications/muscle",
+#' bootstrap = 100,
+#' parallel = FALSE,
+#' method = "retree 1")
+#' h.p <- confidence.heatmap(g_msa_m, title = "GUIDANCE BB50009 benchmark",
+#' legend = TRUE,guidance_score = TRUE)
+#' h.p
+#'
+#' ## Plot both for comparison
+#' h.p.mafft <- confidence.heatmap(g_msa, title = "MAFFT",
+#' legend = FALSE, guidance_score = FALSE)
+#' h.p.muscle <- confidence.heatmap(g_msa_m, title = "MUSCLE",
+#' legend = FALSE, guidance_score = FALSE)
+#' library(cowplot)
+#' plot_grid(h.p.mafft, h.p.muscle, ncol = 1, nrow = 2)
+#' }
+#'
 #' @author Franz-Sebastian Krah
 #' @author Christoph Heibl
 #' @export

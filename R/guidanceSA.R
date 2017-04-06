@@ -137,13 +137,13 @@ guidanceSA <- function(sequences, msa.program, programm,
 
 
   # output
-  res <- list(mean_score = msc,
+  res <- list(scores = list(mean_score = msc,
     column_score = CS,
-    residue_pair_column_scoore = g.sc,
+    residue_pair_column_score = g.sc,
     residue_pair_residue_score = rpr.sc,
     residual_pair_sequence_pair_score  = rpsp.sc,
     residual_pair_sequence_score = rps.sc,
-    residue_pair_score = rp.sc,
+    residue_pair_score = rp.sc),
     reduced_msa = guidance.msa,
     base_msa = base.msa)
   return(res)

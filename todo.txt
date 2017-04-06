@@ -3,5 +3,7 @@
 # Franz
 - Implement PRANK for GUIDANCE
 - user may change model for dist (NJ)
+- update partition alignments for other msa.programms than MAFFT
+- benchmark HoT and GUIDANCE2 (maybe reduced dataset first, ~50 MSAs)
 
 # Christoph:

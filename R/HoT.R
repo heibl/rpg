@@ -203,7 +203,7 @@ HoT <- function(sequences,
       .packages = c('rpg', 'ips', 'adephylo', 'foreach', 'phangorn')) %dopar% {
         # setTxtProgressBar(pb, i)
         align_part_set2(x = sequences, partition_set = align_parts[,i],
-          coopt.sub = n.coopt.sub,
+          coopt.sub = n.coopt.sub[i],
           method = method, exec = exec, msa.program = msa.program,
           files = msa_out[stend[i,1]:stend[i,2]])
       }
