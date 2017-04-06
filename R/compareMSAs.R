@@ -1,5 +1,7 @@
 #' Compare reference MSAs with alternative MSAs
 #'
+#' @description MSA reliability scores (Penn et al. 2010)
+#'
 #' @param ref of class data.frame, is the reference MSA ('BASE MSA') with sequences as columns
 #' @param com like ref, but 1 alternative MSA
 #' @param dir_path directory with multiple alternative MSA files
@@ -13,13 +15,16 @@
 #' @return residual_pair_sequence_score
 #' @return residue_pair_score
 #'
-#' @description Wrapper function for program msa_set_score v2.01 of the GUIDANCE program (see reference). Copyright: To modify the code, or use parts of it for other purposes, permission should be requested. Please contact Tal Pupko: talp@post.tau.ac.il. Please note that the use of the GUIDANCE program is for academic use only
+#' @description Wrapper function for program msa_set_score v2.01 of the GUIDANCE program (see reference). Copyright: To modify the code, or use parts of it for other purposes, permission should be requested. Please contact Tal Pupko: talp@post.tau.ac.il. Please note that the use of the GUIDANCE program is for academic use only.
+#' @description C code computing basic MSA comparision. The most basic is the residue pairs residue score, which checks if residue pairs combinations are correctly aligned in both MSAs. From this the residue score, residue column score (GUIDANCE score), residue sequence score are computed. It also calulates the column score (CS), which simply checks if a column is identically aligned in the alternative MSA.
 #' @references Penn et al. (2010). An alignment confidence score capturing
 #'   robustness to guide tree uncertainty. Molecular Biology and Evolution
 #'   27:1759--1767
 #'
 #' @author Franz-Sebastian Krah
 #' @import plyr
+#'
+#' @seealso \code{\link{guidance}}, \code{\link{guidance2}}, \code{\link{HoT}}
 #' @export
 
 compareMSAs <- function(ref, com, dir_path){
@@ -59,7 +64,7 @@ compareMSAs <- function(ref, com, dir_path){
 
     # store fasta files in temp files
     # rownames(ref) <- paste0("S", 1:dim(ref)[1])
-    # rownames(ref) <- paste0("S", 1:dim(ref)[1])
+    # rownames(com) <- paste0("S", 1:dim(com)[1])
 
     write.fas(ref, file = fns[1])
     write.fas(com, file = fns[2])
@@ -69,7 +74,7 @@ compareMSAs <- function(ref, com, dir_path){
       fns[1],
       paste(tempdir(), rn, sep ="/"),
       "-m",
-      fns[2]), intern = TRUE, ignore.stdout = FALSE)
+      fns[2]), intern = FALSE, ignore.stdout = TRUE)
 
 
     ## read program putput which is in temp dir

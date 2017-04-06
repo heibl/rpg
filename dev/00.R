@@ -17,6 +17,17 @@ seq_dna <- sample(seq_dna,10)
 ## Amino Acids
 seq_aa <- read.fas("dev/data/AATF.fas", type ="AA")
 
+file <- system.file("extdata", "BB50009.fasta", package = "rpg")
+aa_seq<- read.fas(file, type ="AA")
+
+g_msa <- guidance(sequences = aa_seq,
+  msa.program = "mafft",
+  exec = "/usr/local/bin/mafft",
+  bootstrap = 100,
+  parallel = FALSE,
+  method = "retree 1")
+confidence.heatmap(g_msa, title = "GUIDANCE BB30015 benchmark", legend = TRUE,
+  guidance_score = TRUE)
 
 sequences = seq_dna
 parallel = TRUE
@@ -37,14 +48,17 @@ msa.program <- "muscle"
 exec <- "/Applications/muscle"
 
 system.time(g_msa <- guidance(sequences = seq_aa,
-  msa.program = "clustalw2",
-  exec = exec,
-  bootstrap = 10,
+  msa.program = "mafft",
+  # exec = exec,
+  bootstrap = 100,
   col.cutoff = "auto",
   seq.cutoff = "auto",
   mask.cutoff = "auto",
   parallel = FALSE, ncore = "auto",
   method = "retree 1"))
+
+confidence.heatmap(g_msa, title = "GUIDANCE R", legend = TRUE,
+  guidance_score = TRUE)
 
 system.time(
 guidanceSA(sequences = seq_dna,

@@ -1,0 +1,7 @@
+## TO DO ##
+
+# Franz
+- Implement PRANK for GUIDANCE
+- user may change model for dist (NJ)
+
+# Christoph:
