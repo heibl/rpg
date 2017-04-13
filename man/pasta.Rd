@@ -13,7 +13,7 @@ containing unaligned sequences of DNA or amino acids.}
 
 \item{gt}{\emph{Currently unused.}}
 
-\item{k}{An integer given the size of cluster in which the dataset is split.}
+\item{k}{An integer giving the size of cluster in which the dataset is split.}
 }
 \description{
 Provides a complete reimplementation of the PASTA algorithm (Mirarab, Nguyen, and Warnow 2014) in R.

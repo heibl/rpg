@@ -1,5 +1,5 @@
 ## This code is part of the rpg package
-## © C. Heibl 2016 (last update 2017-04-06)
+## © C. Heibl 2016 (last update 2017-04-12)
 
 #' @title Ultra-Large Multiple Sequence Alignment with PASTA
 #' @description Provides a complete reimplementation of the PASTA algorithm (Mirarab, Nguyen, and Warnow 2014) in R.
@@ -47,16 +47,26 @@ pasta <- function(seqs, gt, k = 200, cutoff = 0.93, parallel = FALSE,
 
     ## split dataset in subsets of size <= k
     ## -------------------------------------
-    subtree <- centroidDecomposition(gt, k = k)
-    subtree <- lapply(subtree, function(z) z$tip.label)
-    names(subtree) <- paste0("S", seq_along(subtree))
+    subtrees <- centroidDecomposition(gt, k = k)
+    subtrees <- lapply(subtrees, function(z) z$tip.label)
+    names(subtrees) <- paste0("S", seq_along(subtrees))
+
+    ## alignment of subtrees
+    ## ---------------------
+    foo <- function(seqs, taxa){
+      guidance(seqs[taxa], parallel = parallel, ncore = ncore,
+               bootstrap = bootstrap, msa.program = msa.program,
+               method = method, exec = exec)
+    }
+    s <- lapply(subtrees, foo, seqs = seqs)
 
     ## compute spanning tree of subsets
     ## --------------------------------
-    st <- spanningTreeh(gt, subtree)
+    st <- spanningTree(gt, subtrees)
 
     ## do profile-alignment
     ## --------------------
+    e <- as_edgelist(st)
 
 
   }

@@ -11,12 +11,13 @@ seqs <- read.fas("dev/data/cortinarius_28s_ms.fas")
 # set.seed(100)
 # seq <- sample(ms, 10) ## choose 10 sequences
 
+k = 50
 ncore = 24
 bootstrap = 100
 msa.program = "mafft"
 method = "auto"
 parallel  = TRUE
-cutoff = 0.93
+exec = "/usr/local/bin/mafft"
 
 system.time(test <- pasta(seqs = ms,
                           k = 50,
