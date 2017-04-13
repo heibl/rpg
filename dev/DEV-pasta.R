@@ -28,3 +28,6 @@ system.time(test <- pasta(seqs = ms,
                           parallel = TRUE,
                           cutoff = 0.93))
 # 15 min with 2 cores
+
+
+seqs <- read.fas(x = "dev/data/AATF.fas")
