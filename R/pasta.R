@@ -24,7 +24,7 @@ pasta <- function(seqs, gt, k = 200, cutoff = 0.93, parallel = FALSE,
   if (length(seqs) <= k){
     cat(length(seqs), "species will be aligned with MAFFT L-INS-i\n")
 
-    seqs <- guidance(seqs, cutoff = cutoff, parallel = parallel, ncore = ncore,
+    seqs <- guidance(seqs, parallel = parallel, ncore = ncore,
                      bootstrap = bootstrap, msa.program = msa.program,
                      method = method, exec = exec)
 

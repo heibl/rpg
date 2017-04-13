@@ -9,7 +9,7 @@
 #' @param ncore number of cores
 #' @param bootstrap An integer giving the number of perturbated MSAs.
 #' @param msa.program A charcter string giving the name of the MSA program,
-#'   currelty one of c("mafft", "muscle", "clustalw2"); MAFFT is default
+#'   currenlty one of c("mafft", "muscle", "clustalw2"); MAFFT is default
 #' @param col.cutoff numberic between 0 and 1; specifies a cutoff to remove unreliable columns below the cutoff; either user supplied or "auto" (0.73)
 #' @param seq.cutoff numberic between 0 and 1; specifies a cutoff to remove unreliable sequences below the cutoff; either user supplied of "auto" (0.5)
 #' @param mask.cutoff specific residues below a certain cutoff are masked ('N' for DNA, 'X' for AA); either user supplied of "auto" (0.5)
@@ -72,22 +72,22 @@ guidance2 <- function(sequences,
 
 
   ## Check for MSA program
-  if(missing(exec)){
+  if (missing(exec)){
     os <- Sys.info()[1]
-    if (msa.program =="mafft") {
+    if (msa.program == "mafft") {
       exec <- switch(os, Linux = "mafft", Darwin = "mafft",
         Windows = "mafft.bat")
     }
-    if (msa.program =="muscle") {
+    if (msa.program == "muscle") {
       exec <- switch(os, Linux = "muscle", Darwin = "muscle",
         Windows = "muscle3.8.31_i86win32.exe")
     }
-    if (msa.program =="clustalw2") {
+    if (msa.program == "clustalw2") {
       exec <- switch(os, Linux = "clustalw", Darwin = "clustalw2",
         Windows = "clustalw2.exe")
     }
   }
-  out <- system(paste(exec, "--v", sep=" "), ignore.stdout = TRUE, ignore.stderr = TRUE)
+  out <- system(paste(exec, "--v"), ignore.stdout = TRUE, ignore.stderr = TRUE)
   if (out == 127)
     stop("please provide exec path or install MSA program in root \n
       i.e. in Unix: '/usr/local/bin/mafft'")
@@ -96,12 +96,12 @@ guidance2 <- function(sequences,
   ## generate some parameters if not specified
   #---------------------------------------------
   ## number of cores
-  if(ncore=="auto"){
+  if (ncore == "auto"){
     ncore <- detectCores(all.tests = FALSE, logical = TRUE)
   }
 
   ## specify number of sampled co-optimal MSAs from HoT
-  if(n.coopt == "auto"){ n.coopt <- 4 }
+  if (n.coopt == "auto"){ n.coopt <- 4 }
 
   ## set type of the sequences data
   type <- class(sequences)
@@ -495,7 +495,7 @@ guidance2 <- function(sequences,
   msa <- guidance2.msa <- base.msa
   msa <- as.character(msa)
   ## masking residues below cutoff
-  if (mask.cutoff>0){
+  if (mask.cutoff > 0){
     txt <- as.vector(as.character(base.msa))
     # mat <- data.frame(rpr.sc, txt)
     mat <- data.frame(scores$residue_pair_residue_score, txt)
@@ -503,7 +503,7 @@ guidance2 <- function(sequences,
     coln <- max(mat$col)
     res_mat <- matrix(mat$score, nrow = rown, ncol = coln)
 
-    if (mask.cutoff=="auto"){ mask.cutoff <- 0.50 }
+    if (mask.cutoff == "auto"){ mask.cutoff <- 0.50 }
 
     if (inherits(sequences, "DNAbin")){
       msa[res_mat<mask.cutoff & !is.na(res_mat)] <- "N"
@@ -517,8 +517,8 @@ guidance2 <- function(sequences,
     guidance2.msa <- msa
   }
   ## remove unreliable columns
-  if (col.cutoff>0){
-    if (mask.cutoff>0) { msa <- guidance2.msa
+  if (col.cutoff > 0){
+    if (mask.cutoff > 0) { msa <- guidance2.msa
     } else { msa <- base.msa }
     if(col.cutoff =="auto"){col.cutoff <- 0.97}
     # remove_cols <- g.cs$res_pair_col_score < col.cutoff
@@ -526,8 +526,8 @@ guidance2 <- function(sequences,
     guidance2.msa <- msa[,!remove_cols]
   }
   ## remove unreliable sequences
-  if (seq.cutoff>0){
-    if (mask.cutoff>0) { msa <- guidance2.msa
+  if (seq.cutoff > 0){
+    if (mask.cutoff > 0) { msa <- guidance2.msa
     } else { msa <- base.msa }
     if (seq.cutoff =="auto"){seq.cutoff <- 0.5}
     # remove_sequences <- rps.sc$res_pair_seq_score < seq.cutoff
