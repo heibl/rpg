@@ -1,7 +1,0 @@
-BALIBASE 1-5 Benchmark test
-
-- based on core blocks as defined in guidance2 paper
-- based on SPS 
-- based on benchmarks with more than 7 sequences (297 alignments)
-- both were set on 4 threads (cores)
-- both with "retree 1" method for MAFFT
