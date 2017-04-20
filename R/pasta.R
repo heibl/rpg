@@ -7,6 +7,8 @@
 #'   containing unaligned sequences of DNA or amino acids.
 #' @param gt \emph{Currently unused.}
 #' @param k An integer giving the size of cluster in which the dataset is split.
+#' @importFrom igraph as_edgelist
+#' @importFrom ips mafft mafft.merge
 #' @export
 
 pasta <- function(seqs, gt, k = 200, cutoff = 0.93, parallel = FALSE,
@@ -59,6 +61,8 @@ pasta <- function(seqs, gt, k = 200, cutoff = 0.93, parallel = FALSE,
                method = method, exec = exec)
     }
     s <- lapply(subtrees, foo, seqs = seqs)
+    names(s) <- names(subtrees)
+    seqs <- lapply(s, function(z) z$base_msa)
 
     ## compute spanning tree of subsets
     ## --------------------------------
@@ -67,6 +71,17 @@ pasta <- function(seqs, gt, k = 200, cutoff = 0.93, parallel = FALSE,
     ## do profile-alignment
     ## --------------------
     e <- as_edgelist(st)
+    merger <- function(seqlist, index, exec){
+      mafft.merge(seqlist[index], exec = exec)
+    }
+    seqs <- apply(e, 1, merger, seqlist = seqs, exec = exec)
+    names(seqs) <- paste(e[, 1], e[, 2], sep = "-")
+
+    save.image("devworkspace.rda")
+
+    ## do transitivity merging
+    ## -----------------------
+    load("devworkspace.rda")
 
 
   }
